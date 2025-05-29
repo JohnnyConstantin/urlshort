@@ -2,6 +2,7 @@ package app
 
 import (
 	"net/http"
+	"github.com/JohnnyConstantin/urlshort/internal/store"
 )
 
 type Router struct {
@@ -33,9 +34,9 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			handler(w, req)
 			return
 		}
-		http.Error(w, "Error", 400)
+		http.Error(w, store.DefaultError, store.DefaultErrorCode)
 		return
 	}
 
-	http.Error(w, "Error", 400)
+	http.Error(w, store.DefaultError, store.DefaultErrorCode)
 }

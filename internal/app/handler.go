@@ -22,10 +22,13 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // GetHandler handles GET reqs
 func (h *Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(307)
 	w.Write([]byte("Это GET хендлер"))
 }
 
 // PostHandler handles POsT reqs
 func (h *Handler) PostHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("content-type", "text/plain")
+	w.WriteHeader(http.StatusCreated)
 	w.Write([]byte("Это POST хендлер"))
 }
