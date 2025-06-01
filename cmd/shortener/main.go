@@ -15,7 +15,7 @@ func main() {
 
 	//Накидываем хендлеры на роуты
 	router.AddRoute("/", http.MethodPost, handler.PostHandler)
-	router.AddRoute("/id/", http.MethodGet, handler.GetHandler)
+	router.AddRoute("/{id}", http.MethodGet, handler.GetHandler)
 
 	//Регаем handlers через стандартную либу
 	http.Handle("/", router)

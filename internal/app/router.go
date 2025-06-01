@@ -1,8 +1,9 @@
 package app
 
 import (
-	"net/http"
 	"github.com/JohnnyConstantin/urlshort/internal/store"
+	"net/http"
+	"strings"
 )
 
 type Router struct {
@@ -36,6 +37,18 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 		http.Error(w, store.DefaultError, store.DefaultErrorCode)
 		return
+	}
+
+	if method == http.MethodGet && path != "/" {
+		trimmedPath := strings.Trim(path, "/")
+		if trimmedPath != "" && !strings.Contains(trimmedPath, "/") {
+			if methods, oks := r.routes["/{id}"]; oks {
+				if handler, ok := methods[http.MethodGet]; ok {
+					handler(w, req)
+					return
+				}
+			}
+		}
 	}
 
 	http.Error(w, store.DefaultError, store.DefaultErrorCode)
