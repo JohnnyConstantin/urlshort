@@ -12,16 +12,16 @@ var (
 )
 
 func shortenURL(originalURL string) models.ShortenResponse {
-	var ShortenUrl models.ShortenResponse
+	var ShortenURL models.ShortenResponse
 	shortID := uuid.New().String()[:8]
 
 	mu.Lock()
 	urlStore[shortID] = originalURL
 	mu.Unlock()
 
-	ShortenUrl.Result = shortID
+	ShortenURL.Result = shortID
 
-	return ShortenUrl
+	return ShortenURL
 }
 
 func getFullURL(shortID string) (models.URLResponse, bool) {
