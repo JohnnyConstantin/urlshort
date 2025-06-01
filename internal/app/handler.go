@@ -1,7 +1,11 @@
 package app
 
 import (
+	"github.com/JohnnyConstantin/urlshort/internal/store"
+	"github.com/JohnnyConstantin/urlshort/models"
+	"io"
 	"net/http"
+	"strings"
 )
 
 type Handler struct {
@@ -22,10 +26,43 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // GetHandler handles GET reqs
 func (h *Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("Это GET хендлер"))
+	var response models.URLResponse
+	path := strings.Trim(r.URL.Path, "/")
+	parts := strings.Split(path, "/")
+
+	if len(parts) != 1 {
+		http.Error(w, store.DefaultError, store.DefaultErrorCode)
+		return
+	}
+	
+	id := parts[0]
+
+	response, exists := getFullURL(id)
+	if !exists {
+		http.Error(w, store.DefaultError, store.DefaultErrorCode)
+	}
+
+	w.Header().Set("Location", response.OriginalURL)
+
+	w.WriteHeader(307)
 }
 
 // PostHandler handles POsT reqs
 func (h *Handler) PostHandler(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("Это POST хендлер"))
+	var LongUrl models.ShortenRequest
+	var ShortUrl models.ShortenResponse
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Error reading request body", http.StatusBadRequest)
+		return
+	}
+	defer r.Body.Close()
+
+	LongUrl.URL = string(body)
+	ShortUrl = shortenURL(LongUrl.URL)
+
+	w.Header().Set("content-type", "text/plain")
+	w.WriteHeader(http.StatusCreated)
+	w.Write([]byte("http://" + r.Host + "/" + ShortUrl.Result))
 }
