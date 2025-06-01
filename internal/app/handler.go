@@ -34,7 +34,7 @@ func (h *Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, store.DefaultError, store.DefaultErrorCode)
 		return
 	}
-	
+
 	id := parts[0]
 
 	response, exists := getFullURL(id)
@@ -49,8 +49,8 @@ func (h *Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
 
 // PostHandler handles POsT reqs
 func (h *Handler) PostHandler(w http.ResponseWriter, r *http.Request) {
-	var LongUrl models.ShortenRequest
-	var ShortUrl models.ShortenResponse
+	var LongURL models.ShortenRequest
+	var ShortURL models.ShortenResponse
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -59,10 +59,10 @@ func (h *Handler) PostHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
-	LongUrl.URL = string(body)
-	ShortUrl = shortenURL(LongUrl.URL)
+	LongURL.URL = string(body)
+	ShortURL = shortenURL(LongURL.URL)
 
 	w.Header().Set("content-type", "text/plain")
 	w.WriteHeader(http.StatusCreated)
-	w.Write([]byte("http://" + r.Host + "/" + ShortUrl.Result))
+	w.Write([]byte("http://" + r.Host + "/" + ShortURL.Result))
 }
