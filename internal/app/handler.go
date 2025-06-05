@@ -3,6 +3,7 @@ package app
 import (
 	"github.com/JohnnyConstantin/urlshort/internal/store"
 	"github.com/JohnnyConstantin/urlshort/models"
+	_ "github.com/lib/pq"
 	"io"
 	"net/http"
 	"strings"
@@ -35,9 +36,14 @@ func (h *Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	db, err := store.GetDB()
+	if err != nil {
+		http.Error(w, store.DefaultError, store.DefaultErrorCode)
+	}
+
 	id := parts[0]
 
-	response, exists := getFullURL(id)
+	response, exists := getFullURL(db, id)
 	if !exists {
 		http.Error(w, store.DefaultError, store.DefaultErrorCode)
 	}
@@ -60,7 +66,12 @@ func (h *Handler) PostHandler(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
 	LongURL.URL = string(body)
-	ShortURL = shortenURL(LongURL.URL)
+	db, err := store.GetDB()
+	if err != nil {
+		http.Error(w, store.DefaultError, store.DefaultErrorCode)
+	}
+
+	ShortURL = shortenURL(db, LongURL.URL)
 
 	w.Header().Set("content-type", "text/plain")
 	w.WriteHeader(http.StatusCreated)
