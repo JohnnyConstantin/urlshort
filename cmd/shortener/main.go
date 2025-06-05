@@ -12,7 +12,7 @@ func main() {
 
 	//Чтобы удобнее было работать
 	handler := server.Handler
-	router := route.NewRouter()
+	router := route.NewRouter() //Используем внешний роутер chi, вместо встроенного в объект app.Server
 
 	//Накидываем хендлеры на роуты
 	router.Post("/", handler.PostHandler)

@@ -5,6 +5,7 @@ type Server struct {
 	Router  *Router
 }
 
+// NewServer Инициализирует сервер с пустым хендлером и роутером
 func (s *Server) NewServer() *Server {
 	serv := &Server{
 		Handler: NewHandler(),

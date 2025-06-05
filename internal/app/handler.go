@@ -13,6 +13,7 @@ type Handler struct {
 	router *Router
 }
 
+// NewHandler Инциализация объекта хендлера с пустым роутером
 func NewHandler() *Handler {
 	h := &Handler{
 		router: NewRouter(),
@@ -21,11 +22,12 @@ func NewHandler() *Handler {
 	return h
 }
 
+// ServeHTTP Утиная типизация, прокидываемся до функциональной части роутера по роутингу запросов на хендлер
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.router.ServeHTTP(w, r)
 }
 
-// GetHandler handles GET reqs
+// GetHandler обрабатывает GET запросы
 func (h *Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
 	var response models.URLResponse
 	path := strings.Trim(r.URL.Path, "/")
@@ -48,7 +50,7 @@ func (h *Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(307)
 }
 
-// PostHandler handles POsT reqs
+// PostHandler обрабатывает POST запросы
 func (h *Handler) PostHandler(w http.ResponseWriter, r *http.Request) {
 	var LongURL models.ShortenRequest
 	var ShortURL models.ShortenResponse
