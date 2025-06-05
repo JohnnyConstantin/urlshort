@@ -17,7 +17,7 @@ func shortenURL(originalURL string) models.ShortenResponse {
 	shortID := uuid.New().String()[:8]
 
 	mu.Lock()
-	store.UrlStore[shortID] = originalURL
+	store.URLStore[shortID] = originalURL
 	mu.Unlock()
 
 	ShortenURL.Result = shortID
@@ -30,7 +30,7 @@ func getFullURL(shortID string) (models.URLResponse, bool) {
 
 	mu.RLock()
 	defer mu.RUnlock()
-	originalURL, exists := store.UrlStore[shortID]
+	originalURL, exists := store.URLStore[shortID]
 	if exists {
 		Result.OriginalURL = originalURL
 		Result.ShortURL = shortID
