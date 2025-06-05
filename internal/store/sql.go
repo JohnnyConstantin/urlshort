@@ -14,7 +14,7 @@ import (
 func GetDB() (*sql.DB, error) {
 
 	//Вгружаем переменные окружения, в т.ч. креды для бд
-	err := godotenv.Load(config.PATH_TO_ENV)
+	err := godotenv.Load(config.PathToENV)
 	if err != nil {
 		log.Fatal("Error loading .env file")
 	}
