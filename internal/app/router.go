@@ -7,22 +7,22 @@ import (
 )
 
 type Router struct {
-	routes map[string]map[string]http.HandlerFunc
+	Routes map[string]map[string]http.HandlerFunc
 }
 
 // NewRouter returns new *Router with empty routes
 func NewRouter() *Router {
 	return &Router{
-		routes: make(map[string]map[string]http.HandlerFunc),
+		Routes: make(map[string]map[string]http.HandlerFunc),
 	}
 }
 
 // AddRoute registers new route for handler. If passed existing one, it is overwritten
 func (r *Router) AddRoute(path string, method string, handler http.HandlerFunc) {
-	if _, ok := r.routes[path]; !ok {
-		r.routes[path] = make(map[string]http.HandlerFunc)
+	if _, ok := r.Routes[path]; !ok {
+		r.Routes[path] = make(map[string]http.HandlerFunc)
 	}
-	r.routes[path][method] = handler
+	r.Routes[path][method] = handler
 }
 
 // ServeHTTP Routes request to handler method
@@ -30,7 +30,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	path := req.URL.Path
 	method := req.Method
 
-	if methods, ok := r.routes[path]; ok {
+	if methods, ok := r.Routes[path]; ok {
 		if handler, oks := methods[method]; oks {
 			handler(w, req)
 			return
@@ -42,7 +42,7 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if method == http.MethodGet && path != "/" {
 		trimmedPath := strings.Trim(path, "/")
 		if trimmedPath != "" && !strings.Contains(trimmedPath, "/") {
-			if methods, oks := r.routes["/{id}"]; oks {
+			if methods, oks := r.Routes["/{id}"]; oks {
 				if handler, ok := methods[http.MethodGet]; ok {
 					handler(w, req)
 					return
