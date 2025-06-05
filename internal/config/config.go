@@ -2,5 +2,5 @@ package config
 
 var (
 	AppName   = "shortener"
-	PathToENV = "../../.env"
+	PathToENV = ".env" //Should be used by db
 )

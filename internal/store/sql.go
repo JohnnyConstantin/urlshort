@@ -1,5 +1,7 @@
 package store
 
+//Works with local tests, but CI test are falling, because postgres container in CI doesn't create database and tables
+//so... Falling back to memory.go storage
 import (
 	"database/sql"
 	"fmt"
