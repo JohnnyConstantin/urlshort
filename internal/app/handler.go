@@ -36,14 +36,9 @@ func (h *Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	db, err := store.GetDB()
-	if err != nil {
-		http.Error(w, store.DefaultError, store.DefaultErrorCode)
-	}
-
 	id := parts[0]
 
-	response, exists := getFullURL(db, id)
+	response, exists := getFullURL(id)
 	if !exists {
 		http.Error(w, store.DefaultError, store.DefaultErrorCode)
 	}
@@ -66,12 +61,7 @@ func (h *Handler) PostHandler(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
 	LongURL.URL = string(body)
-	db, err := store.GetDB()
-	if err != nil {
-		http.Error(w, store.DefaultError, store.DefaultErrorCode)
-	}
-
-	ShortURL = shortenURL(db, LongURL.URL)
+	ShortURL = shortenURL(LongURL.URL)
 
 	w.Header().Set("content-type", "text/plain")
 	w.WriteHeader(http.StatusCreated)

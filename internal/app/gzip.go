@@ -1,9 +1,9 @@
 package app
 
 import (
-	"database/sql"
 	"github.com/JohnnyConstantin/urlshort/internal/store"
 	"github.com/JohnnyConstantin/urlshort/models"
+	"github.com/google/uuid"
 	"sync"
 )
 
@@ -11,34 +11,30 @@ var (
 	mu sync.RWMutex
 )
 
-func shortenURL(db *sql.DB, originalURL string) models.ShortenResponse {
+func shortenURL(originalURL string) models.ShortenResponse {
 	var ShortenURL models.ShortenResponse
 
-	shortURL, exists := store.IsDuplicate(db, originalURL)
-	if exists {
-		ShortenURL.Result = shortURL
-		return ShortenURL
-	}
+	shortID := uuid.New().String()[:8]
 
-	shortID, err := store.Insert(db, originalURL)
-	if err != nil {
-		return ShortenURL
-	}
+	mu.Lock()
+	store.UrlStore[shortID] = originalURL
+	mu.Unlock()
 
 	ShortenURL.Result = shortID
 
 	return ShortenURL
 }
 
-func getFullURL(db *sql.DB, shortID string) (models.URLResponse, bool) {
+func getFullURL(shortID string) (models.URLResponse, bool) {
 	var Result models.URLResponse
 
-	originalURL, err := store.Read(db, shortID)
-	if err != nil {
-		return Result, false
+	mu.RLock()
+	defer mu.RUnlock()
+	originalURL, exists := store.UrlStore[shortID]
+	if exists {
+		Result.OriginalURL = originalURL
+		Result.ShortURL = shortID
+		return Result, exists
 	}
-
-	Result.OriginalURL = originalURL
-	Result.ShortURL = shortID
-	return Result, true
+	return Result, exists
 }
