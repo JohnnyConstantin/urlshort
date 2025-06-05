@@ -10,14 +10,14 @@ type Router struct {
 	Routes map[string]map[string]http.HandlerFunc
 }
 
-// NewRouter returns new *Router with empty routes
+// NewRouter возвращает новый *Router с пустыми роутами
 func NewRouter() *Router {
 	return &Router{
-		Routes: make(map[string]map[string]http.HandlerFunc),
+		Routes: make(map[string]map[string]http.HandlerFunc), //Словарь, содержащий роуты,методы и хендлеры к ним
 	}
 }
 
-// AddRoute registers new route for handler. If passed existing one, it is overwritten
+// AddRoute регистрирует новый хендлер для роута. Если передается существующий роут - он перезаписывается
 func (r *Router) AddRoute(path string, method string, handler http.HandlerFunc) {
 	if _, ok := r.Routes[path]; !ok {
 		r.Routes[path] = make(map[string]http.HandlerFunc)
@@ -25,7 +25,8 @@ func (r *Router) AddRoute(path string, method string, handler http.HandlerFunc) 
 	r.Routes[path][method] = handler
 }
 
-// ServeHTTP Routes request to handler method
+// ServeHTTP Роутит запросы на зарезервированный в структуре Router хендлер. Необходим для роутера,
+// чтобы подстроиться под стандартную либу net.http с помощью утиной типизации
 func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	path := req.URL.Path
 	method := req.Method

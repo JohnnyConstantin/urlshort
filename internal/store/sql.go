@@ -1,7 +1,9 @@
 package store
 
-//Works with local tests, but CI test are falling, because postgres container in CI doesn't create database and tables
-//so... Falling back to memory.go storage
+//Работает с локальными тестами, но через CI не проходит, потому что контейнер с постгрес не создает
+//необходимую базу и таблицы, а также (судя по всему) в volume контейнера не закидывается .env файл
+//поэтому... Вместо бд используется memory.go
+
 import (
 	"database/sql"
 	"fmt"
