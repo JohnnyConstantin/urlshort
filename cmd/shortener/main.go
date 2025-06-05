@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/JohnnyConstantin/urlshort/internal/app"
+	route "github.com/go-chi/chi/v5"
 	"net/http"
 )
 
@@ -11,15 +12,13 @@ func main() {
 
 	//Чтобы удобнее было работать
 	handler := server.Handler
-	router := server.Router
+	router := route.NewRouter()
 
 	//Накидываем хендлеры на роуты
-	router.AddRoute("/", http.MethodPost, handler.PostHandler)
-	router.AddRoute("/{id}", http.MethodGet, handler.GetHandler)
+	router.Post("/", handler.PostHandler)
+	router.Get("/{id}", handler.GetHandler)
 
-	//Регаем handlers через стандартную либу
-	http.Handle("/", router)
-	err := http.ListenAndServe(":8080", nil)
+	err := http.ListenAndServe(":8080", router)
 	if err != nil {
 		return
 	}
