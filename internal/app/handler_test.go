@@ -2,6 +2,7 @@ package app
 
 import (
 	"bytes"
+	"github.com/JohnnyConstantin/urlshort/internal/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"net/http"
@@ -52,8 +53,10 @@ func TestGetHandler(t *testing.T) {
 	rr := httptest.NewRecorder()
 	handler.PostHandler(rr, req)
 
+	println(rr.Body.String())
+
 	shortURL := rr.Body.Bytes()
-	id := strings.TrimPrefix(string(shortURL), "http:///")
+	id := strings.TrimPrefix(string(shortURL), config.Options.BaseAddress)
 
 	// Проверка Get обработчика
 	req, err = http.NewRequest(http.MethodGet, "/"+id, nil)
