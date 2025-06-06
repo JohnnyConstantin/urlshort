@@ -9,6 +9,7 @@ import (
 	route "github.com/go-chi/chi/v5"
 	"net/http"
 	"net/http/httptest"
+	"os"
 )
 
 func main() {
@@ -29,6 +30,13 @@ func main() {
 	})
 
 	flag.Parse()
+
+	if envA := os.Getenv("SERVER_ADDRESS"); envA != "" {
+		config.Options.Address = envA
+	}
+	if envB := os.Getenv("BASE_URL"); envB != "" {
+		config.Options.BaseAddress = envB
+	}
 
 	err := http.ListenAndServe(config.Options.Address, router)
 	if err != nil {
