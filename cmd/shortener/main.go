@@ -5,6 +5,7 @@ import (
 	"flag"
 	"github.com/JohnnyConstantin/urlshort/internal/app"
 	"github.com/JohnnyConstantin/urlshort/internal/config"
+	"github.com/JohnnyConstantin/urlshort/models"
 	route "github.com/go-chi/chi/v5"
 	"net/http"
 	"net/http/httptest"
@@ -19,8 +20,13 @@ func main() {
 	router := route.NewRouter() //Используем внешний роутер chi, вместо встроенного в объект app.Server
 
 	//Накидываем хендлеры на роуты
-	router.Post("/", jsonResponseMiddleware(handler.PostHandler))
-	router.Get("/{id}", handler.GetHandler)
+	router.Route("/", func(r route.Router) {
+		r.Post("/", handler.PostHandler)
+		r.Route("/api", func(r route.Router) {
+			r.Post("/shorten", jsonResponseMiddleware(handler.PostHandler))
+		})
+		r.Get("/{id}", handler.GetHandler)
+	})
 
 	flag.Parse()
 
@@ -43,15 +49,12 @@ func jsonResponseMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		w.WriteHeader(rr.Code)
 
 		if rr.Header().Get("Content-Type") == "application/json" {
-			w.Write(rr.Body.Bytes())
+			var response models.ShortenResponse
+			response.Result = rr.Body.String()
+
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(response)
 			return
 		}
-
-		response := map[string]string{
-			"url": rr.Body.String(),
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
 	}
 }
