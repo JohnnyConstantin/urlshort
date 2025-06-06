@@ -65,17 +65,18 @@ func (h *Handler) PostHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
-	if err = json.Unmarshal(body, &OriginalURL); err != nil {
-		http.Error(w, store.DefaultError, store.DefaultErrorCode)
+	if r.Header.Get("Content-Type") == "application/json" {
+		if err = json.Unmarshal(body, &OriginalURL); err != nil {
+			http.Error(w, store.DefaultError, store.DefaultErrorCode)
+		}
+		w.Header().Set("Content-Type", "application/json")
+	} else {
+		OriginalURL.URL = string(body)
+		w.Header().Set("Content-Type", "text/plain")
 	}
+
 	ShortURL = shortenURL(OriginalURL.URL)
 
-	w.Header().Set("content-type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	jsonResponse, err := json.Marshal(ShortURL)
-	if err != nil {
-		http.Error(w, err.Error(), store.DefaultErrorCode)
-		return
-	}
-	w.Write(jsonResponse)
+	w.Write([]byte(ShortURL.Result))
 }
