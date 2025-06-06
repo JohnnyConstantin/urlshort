@@ -1,6 +1,7 @@
 package app
 
 import (
+	"encoding/json"
 	"github.com/JohnnyConstantin/urlshort/internal/store"
 	"github.com/JohnnyConstantin/urlshort/models"
 	_ "github.com/lib/pq"
@@ -29,7 +30,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // GetHandler обрабатывает GET запросы
 func (h *Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
-	var response models.URLResponse
+	response := models.ShortenRequest{URL: ""}
 	path := strings.Trim(r.URL.Path, "/")
 	parts := strings.Split(path, "/")
 
@@ -45,27 +46,36 @@ func (h *Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, store.DefaultError, store.DefaultErrorCode)
 	}
 
-	w.Header().Set("Location", response.OriginalURL)
+	result := response.URL
+
+	w.Header().Set("Location", result)
 
 	w.WriteHeader(307)
 }
 
 // PostHandler обрабатывает POST запросы
 func (h *Handler) PostHandler(w http.ResponseWriter, r *http.Request) {
-	var LongURL models.ShortenRequest
 	var ShortURL models.ShortenResponse
+	var OriginalURL models.ShortenRequest
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, "Error reading request body", http.StatusBadRequest)
+		http.Error(w, store.DefaultError, store.DefaultErrorCode)
 		return
 	}
 	defer r.Body.Close()
 
-	LongURL.URL = string(body)
-	ShortURL = shortenURL(LongURL.URL)
+	if err = json.Unmarshal(body, &OriginalURL); err != nil {
+		http.Error(w, store.DefaultError, store.DefaultErrorCode)
+	}
+	ShortURL = shortenURL(OriginalURL.URL)
 
-	w.Header().Set("content-type", "text/plain")
+	w.Header().Set("content-type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	w.Write([]byte("http://" + r.Host + "/" + ShortURL.Result))
+	jsonResponse, err := json.Marshal(ShortURL)
+	if err != nil {
+		http.Error(w, err.Error(), store.DefaultErrorCode)
+		return
+	}
+	w.Write(jsonResponse)
 }

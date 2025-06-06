@@ -1,6 +1,7 @@
 package app
 
 import (
+	"github.com/JohnnyConstantin/urlshort/internal/config"
 	"github.com/JohnnyConstantin/urlshort/internal/store"
 	"github.com/JohnnyConstantin/urlshort/models"
 	"github.com/google/uuid"
@@ -22,22 +23,21 @@ func shortenURL(originalURL string) models.ShortenResponse {
 	store.URLStore[shortID] = originalURL
 	mu.Unlock()
 
-	ShortenURL.Result = shortID
+	ShortenURL.Result = config.Options.BaseAddress + shortID
 
 	return ShortenURL
 }
 
 // Используется для получения полного URL, используя короткий
-func getFullURL(shortID string) (models.URLResponse, bool) {
-	var Result models.URLResponse
+func getFullURL(shortID string) (models.ShortenRequest, bool) {
+	Result := models.ShortenRequest{URL: ""}
 
 	//Оверкилл, но в будущем может пригодиться при использовании горутин на хендлерах
 	mu.RLock()
 	defer mu.RUnlock()
 	originalURL, exists := store.URLStore[shortID]
 	if exists {
-		Result.OriginalURL = originalURL
-		Result.ShortURL = shortID
+		Result.URL = originalURL
 		return Result, exists
 	}
 	return Result, exists
