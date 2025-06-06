@@ -56,7 +56,7 @@ func TestGetHandler(t *testing.T) {
 	println(rr.Body.String())
 
 	shortURL := rr.Body.Bytes()
-	id := strings.TrimPrefix(string(shortURL), config.Options.BaseAddress)
+	id := strings.TrimPrefix(string(shortURL), config.Options.BaseAddress+"/")
 
 	// Проверка Get обработчика
 	req, err = http.NewRequest(http.MethodGet, "/"+id, nil)
