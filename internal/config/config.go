@@ -22,6 +22,6 @@ func init() {
 	flag.StringVar(
 		&Options.BaseAddress,
 		"b",
-		"http://localhost:8080/",
+		"http://localhost:8080",
 		"The address to return after shortener")
 }

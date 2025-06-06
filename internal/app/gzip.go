@@ -23,7 +23,7 @@ func shortenURL(originalURL string) models.ShortenResponse {
 	store.URLStore[shortID] = originalURL
 	mu.Unlock()
 
-	ShortenURL.Result = config.Options.BaseAddress + shortID
+	ShortenURL.Result = config.Options.BaseAddress + "/" + shortID
 
 	return ShortenURL
 }
