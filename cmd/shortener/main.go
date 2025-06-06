@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	_ "encoding/json"
 	"flag"
 	"github.com/JohnnyConstantin/urlshort/internal/app"
 	"github.com/JohnnyConstantin/urlshort/internal/config"
