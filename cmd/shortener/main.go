@@ -19,7 +19,7 @@ func main() {
 	router := route.NewRouter() //Используем внешний роутер chi, вместо встроенного в объект app.Server
 
 	//Накидываем хендлеры на роуты
-	router.Post("/api/shorten", jsonResponseMiddleware(handler.PostHandler))
+	router.Post("/", jsonResponseMiddleware(handler.PostHandler))
 	router.Get("/{id}", handler.GetHandler)
 
 	flag.Parse()
