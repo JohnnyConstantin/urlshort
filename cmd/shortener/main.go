@@ -23,22 +23,32 @@ func main() {
 	handler := server.Handler
 	router := route.NewRouter() //Используем внешний роутер chi, вместо встроенного в объект app.Server
 
-	// создаём предустановленный регистратор zap
+	//Создаём предустановленный регистратор zap
 	logger, err := zap.NewDevelopment()
 	if err != nil {
 		panic(err)
 	}
 	defer logger.Sync()
 
-	sugar = *logger.Sugar()
+	sugar = *logger.Sugar() // Создали экземпляр и в дальнейшем прокидываем его в middleware с логированием
 
 	//Накидываем хендлеры на роуты
 	router.Route("/", func(r route.Router) {
-		r.Post("/", app.WithLogging(handler.PostHandler, sugar))
+		r.Post("/",
+			app.GzipHandle( // Сжатие
+				app.WithLogging( // Логирование
+					handler.PostHandler, sugar))) // Сам хендлер
 		r.Route("/api", func(r route.Router) {
-			r.Post("/shorten", app.WithLogging(jsonResponseMiddleware(handler.PostHandler), sugar))
+			r.Post("/shorten",
+				app.GzipHandle( // Сжатие
+					app.WithLogging( // Логирование
+						jsonResponseMiddleware( // Работа с json request/response
+							handler.PostHandler), sugar))) // Сам хендлер
 		})
-		r.Get("/{id}", app.WithLogging(handler.GetHandler, sugar))
+		r.Get("/{id}",
+			app.GzipHandle( // Сжатие
+				app.WithLogging( // Логирование
+					handler.GetHandler, sugar))) // Сам хендлер
 	})
 
 	flag.Parse()

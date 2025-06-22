@@ -25,7 +25,7 @@ func init() {
 		"b",
 		"http://localhost:8080",
 		"The address to return after shortener")
-	flag.StringVar(
+	flag.StringVar( // Странно, что тесты намекают о необходимости этого флага в 6 инкременте, а появится он реально только в 9
 		&Options.FileToWrite,
 		"f",
 		"log.log",
