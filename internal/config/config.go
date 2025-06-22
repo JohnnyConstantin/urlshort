@@ -11,6 +11,7 @@ var (
 var Options struct {
 	Address     string
 	BaseAddress string
+	FileToWrite string
 }
 
 func init() {
@@ -24,4 +25,10 @@ func init() {
 		"b",
 		"http://localhost:8080",
 		"The address to return after shortener")
+	flag.StringVar(
+		&Options.FileToWrite,
+		"f",
+		"log.log",
+		"File to write logs",
+	)
 }
