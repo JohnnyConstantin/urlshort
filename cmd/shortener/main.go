@@ -7,10 +7,13 @@ import (
 	"github.com/JohnnyConstantin/urlshort/internal/config"
 	"github.com/JohnnyConstantin/urlshort/models"
 	route "github.com/go-chi/chi/v5"
+	"go.uber.org/zap"
 	"net/http"
 	"net/http/httptest"
 	"os"
 )
+
+var sugar zap.SugaredLogger
 
 func main() {
 	var s app.Server
@@ -20,13 +23,22 @@ func main() {
 	handler := server.Handler
 	router := route.NewRouter() //Используем внешний роутер chi, вместо встроенного в объект app.Server
 
+	// создаём предустановленный регистратор zap
+	logger, err := zap.NewDevelopment()
+	if err != nil {
+		panic(err)
+	}
+	defer logger.Sync()
+
+	sugar = *logger.Sugar()
+
 	//Накидываем хендлеры на роуты
 	router.Route("/", func(r route.Router) {
-		r.Post("/", handler.PostHandler)
+		r.Post("/", app.WithLogging(handler.PostHandler, sugar))
 		r.Route("/api", func(r route.Router) {
-			r.Post("/shorten", jsonResponseMiddleware(handler.PostHandler))
+			r.Post("/shorten", app.WithLogging(jsonResponseMiddleware(handler.PostHandler), sugar))
 		})
-		r.Get("/{id}", handler.GetHandler)
+		r.Get("/{id}", app.WithLogging(handler.GetHandler, sugar))
 	})
 
 	flag.Parse()
@@ -38,7 +50,13 @@ func main() {
 		config.Options.BaseAddress = envB
 	}
 
-	err := http.ListenAndServe(config.Options.Address, router)
+	// записываем в лог, что сервер запускается
+	sugar.Infow(
+		"Starting server",
+		"addr", config.Options.Address,
+	)
+
+	err = http.ListenAndServe(config.Options.Address, router)
 	if err != nil {
 		return
 	}
