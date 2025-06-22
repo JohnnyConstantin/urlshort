@@ -53,8 +53,6 @@ func TestGetHandler(t *testing.T) {
 	rr := httptest.NewRecorder()
 	handler.PostHandler(rr, req)
 
-	println(rr.Body.String())
-
 	shortURL := rr.Body.Bytes()
 	id := strings.TrimPrefix(string(shortURL), config.Options.BaseAddress+"/")
 

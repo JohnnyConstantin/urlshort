@@ -60,10 +60,16 @@ func (h *Handler) PostHandler(w http.ResponseWriter, r *http.Request) {
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, store.DefaultError, store.DefaultErrorCode)
+		http.Error(w, store.ReadBodyError, store.DefaultErrorCode)
 		return
 	}
 	defer r.Body.Close()
+
+	// Ограничиваем размер тела запроса
+	if len(body) > 1024*1024 { // 1MB
+		http.Error(w, store.LargeBodyError, store.DefaultErrorCode)
+		return
+	}
 
 	if r.Header.Get("Content-Type") == "application/json" {
 		if err = json.Unmarshal(body, &OriginalURL); err != nil {
