@@ -59,6 +59,9 @@ func main() {
 	if envB := os.Getenv("BASE_URL"); envB != "" {
 		config.Options.BaseAddress = envB
 	}
+	if envC := os.Getenv("FILE_STORAGE_PATH"); envC != "" {
+		config.Options.FileToWrite = envC
+	}
 
 	// записываем в лог, что сервер запускается
 	sugar.Infow(
@@ -66,6 +69,10 @@ func main() {
 		"addr", config.Options.Address,
 	)
 
+	err = app.LoadURLsFromFile(config.Options.FileToWrite, sugar)
+	if err != nil {
+		return
+	}
 	err = http.ListenAndServe(config.Options.Address, router)
 	if err != nil {
 		return
