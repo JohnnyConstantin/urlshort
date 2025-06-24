@@ -42,7 +42,7 @@ func main() {
 			r.Post("/shorten",
 				app.GzipHandle( // Сжатие
 					app.WithLogging( // Логирование, прокидываем в него регистратор логов sugar
-						jsonResponseMiddleware( // Работа с json request/response
+						JSONResponseMiddleware( // Работа с json request/response
 							handler.PostHandler), sugar))) // Сам хендлер
 		})
 		r.Get("/{id}",
@@ -83,42 +83,42 @@ func main() {
 	}
 }
 
-// Кастомный ResponseWriter для перехвата данных в JsonMiddleware
-type responseWriterJson struct {
+// Кастомный ResponseWriter для перехвата данных в JSONMiddleware
+type responseWriterJSON struct {
 	http.ResponseWriter
 	body       *bytes.Buffer
 	statusCode int
 	header     http.Header
 }
 
-func (rw *responseWriterJson) WriteHeader(statusCode int) {
+func (rw *responseWriterJSON) WriteHeader(statusCode int) {
 	rw.statusCode = statusCode
 }
 
-func (rw *responseWriterJson) Write(b []byte) (int, error) {
+func (rw *responseWriterJSON) Write(b []byte) (int, error) {
 	return rw.body.Write(b)
 }
 
-func (rw *responseWriterJson) Header() http.Header {
+func (rw *responseWriterJSON) Header() http.Header {
 	if rw.header == nil {
 		rw.header = make(http.Header)
 	}
 	return rw.header
 }
 
-// Middleware для проверки того, что возвращаемое значение является JSON. Иначе переводит его в JSON.
+// JSONResponseMiddleware Middleware для проверки того, что возвращаемое значение является JSON. Иначе переводит его в JSON.
 // Этот middleware хотелось бы вынести внутрь app в отдельный файл validator.go, но тогда не проходит автотест на импорт json
 // в main.go (а без этого middleware импорт json здесь не нужен)
-func jsonResponseMiddleware(next http.HandlerFunc) http.HandlerFunc {
+func JSONResponseMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Создаем  ResponseWriterJson для перехвата ответа
-		rw := &responseWriterJson{
+		// Создаем  ResponseWriterJSON для перехвата ответа
+		rw := &responseWriterJSON{
 			ResponseWriter: w,
 			body:           new(bytes.Buffer),
 			statusCode:     http.StatusCreated, // По умолчанию 201
 		}
 
-		// Вызываем следующий обработчик с ResponseWriterJson
+		// Вызываем следующий обработчик с ResponseWriterJSON
 		next(rw, r)
 
 		// Копируем заголовки
