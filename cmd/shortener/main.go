@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
 	"github.com/JohnnyConstantin/urlshort/internal/app"
@@ -9,7 +10,6 @@ import (
 	route "github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
 	"net/http"
-	"net/http/httptest"
 	"os"
 )
 
@@ -83,24 +83,63 @@ func main() {
 	}
 }
 
-// Middleware для проверки того, что возвращаемое значение является JSON. Иначе переводит его в JSON
+// Кастомный ResponseWriter для перехвата данных в JsonMiddleware
+type responseWriterJson struct {
+	http.ResponseWriter
+	body       *bytes.Buffer
+	statusCode int
+	header     http.Header
+}
+
+func (rw *responseWriterJson) WriteHeader(statusCode int) {
+	rw.statusCode = statusCode
+}
+
+func (rw *responseWriterJson) Write(b []byte) (int, error) {
+	return rw.body.Write(b)
+}
+
+func (rw *responseWriterJson) Header() http.Header {
+	if rw.header == nil {
+		rw.header = make(http.Header)
+	}
+	return rw.header
+}
+
+// Middleware для проверки того, что возвращаемое значение является JSON. Иначе переводит его в JSON.
+// Этот middleware хотелось бы вынести внутрь app в отдельный файл validator.go, но тогда не проходит автотест на импорт json
+// в main.go (а без этого middleware импорт json здесь не нужен)
 func jsonResponseMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		rr := httptest.NewRecorder()
-		next(rr, r)
+		// Создаем  ResponseWriterJson для перехвата ответа
+		rw := &responseWriterJson{
+			ResponseWriter: w,
+			body:           new(bytes.Buffer),
+			statusCode:     http.StatusCreated, // По умолчанию 201
+		}
 
-		for k, v := range rr.Header() {
+		// Вызываем следующий обработчик с ResponseWriterJson
+		next(rw, r)
+
+		// Копируем заголовки
+		for k, v := range rw.header {
 			w.Header()[k] = v
 		}
-		w.WriteHeader(rr.Code)
 
-		if rr.Header().Get("Content-Type") == "application/json" {
-			var response models.ShortenResponse
-			response.Result = rr.Body.String()
-
-			w.Header().Set("Content-Type", "application/json")
+		// Если это JSON ответ - обрабатываем
+		if rw.Header().Get("Content-Type") == "application/json" {
+			response := models.ShortenResponse{
+				Result: rw.body.String(),
+			}
+			w.WriteHeader(rw.statusCode)
 			json.NewEncoder(w).Encode(response)
 			return
+		}
+
+		// Для не-JSON ответов просто копируем тело и статус код
+		w.WriteHeader(rw.statusCode)
+		if rw.body.Len() > 0 {
+			w.Write(rw.body.Bytes())
 		}
 	}
 }
