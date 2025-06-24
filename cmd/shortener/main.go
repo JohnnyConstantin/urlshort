@@ -36,23 +36,24 @@ func main() {
 	router.Route("/", func(r route.Router) {
 		r.Post("/",
 			app.GzipHandle( // Сжатие
-				app.WithLogging( // Логирование
+				app.WithLogging( // Логирование, прокидываем в него регистратор логов sugar
 					handler.PostHandler, sugar))) // Сам хендлер
 		r.Route("/api", func(r route.Router) {
 			r.Post("/shorten",
 				app.GzipHandle( // Сжатие
-					app.WithLogging( // Логирование
+					app.WithLogging( // Логирование, прокидываем в него регистратор логов sugar
 						jsonResponseMiddleware( // Работа с json request/response
 							handler.PostHandler), sugar))) // Сам хендлер
 		})
 		r.Get("/{id}",
 			app.GzipHandle( // Сжатие
-				app.WithLogging( // Логирование
+				app.WithLogging( // Логирование, прокидываем в него регистратор логов sugar
 					handler.GetHandler, sugar))) // Сам хендлер
 	})
 
 	flag.Parse()
 
+	//Подгружаем переменные окружения при наличии
 	if envA := os.Getenv("SERVER_ADDRESS"); envA != "" {
 		config.Options.Address = envA
 	}
@@ -69,6 +70,9 @@ func main() {
 		"addr", config.Options.Address,
 	)
 
+	// Подгружаем URL из файла-хранилища в память-хранилище
+	// При большой нагрузке это так себе решение, потому что съедим кучу оперативы, но для PoC - acceptable :)
+	// В проде в любом случае необходимо использовать реальную СУБД, а не файлы/memory storage
 	err = app.LoadURLsFromFile(config.Options.FileToWrite, sugar)
 	if err != nil {
 		return
@@ -77,7 +81,6 @@ func main() {
 	if err != nil {
 		return
 	}
-
 }
 
 // Middleware для проверки того, что возвращаемое значение является JSON. Иначе переводит его в JSON

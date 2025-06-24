@@ -12,19 +12,14 @@ var (
 	mu sync.RWMutex
 )
 
-type URLRecord struct {
-	UUID        string `json:"uuid"`
-	ShortURL    string `json:"short_url"`
-	OriginalURL string `json:"original_url"`
-}
-
 // Используется для получения короткого URL, используя полный
 func shortenURL(originalURL string) models.ShortenResponse {
 	var ShortenURL models.ShortenResponse
 
 	shortID := uuid.New().String()[:8]
 
-	record := URLRecord{
+	//Создаем объект для записи в файл
+	record := models.URLRecord{
 		UUID:        uuid.New().String()[:4],
 		ShortURL:    shortID,
 		OriginalURL: originalURL,
@@ -32,8 +27,8 @@ func shortenURL(originalURL string) models.ShortenResponse {
 
 	//Оверкилл, но в будущем может пригодиться при использовании горутин на хендлерах
 	mu.Lock()
-	store.URLStore[shortID] = originalURL
-	err := SaveToFile(record)
+	store.URLStore[shortID] = originalURL // сохраняем в память
+	err := SaveToFile(record)             // сохраняем в файл
 	if err != nil {
 		return models.ShortenResponse{}
 	}

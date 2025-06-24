@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"github.com/JohnnyConstantin/urlshort/internal/config"
 	"github.com/JohnnyConstantin/urlshort/internal/store"
+	"github.com/JohnnyConstantin/urlshort/models"
 	"go.uber.org/zap"
 	"io"
 	"net/http"
@@ -70,7 +71,8 @@ func WithLogging(h http.HandlerFunc, logger zap.SugaredLogger) http.HandlerFunc 
 	}
 }
 
-func SaveToFile(event URLRecord) error {
+// SaveToFile сохранение объекта URLRecord в файл
+func SaveToFile(event models.URLRecord) error {
 	file, err := os.OpenFile(config.Options.FileToWrite, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
@@ -95,6 +97,7 @@ func SaveToFile(event URLRecord) error {
 	return writer.Flush()
 }
 
+// LoadURLsFromFile загрузка записей из файла в память
 func LoadURLsFromFile(filename string, logger zap.SugaredLogger) error {
 	file, err := os.Open(filename)
 	if err != nil {
@@ -108,7 +111,7 @@ func LoadURLsFromFile(filename string, logger zap.SugaredLogger) error {
 	decoder := json.NewDecoder(file)
 
 	for {
-		var record URLRecord
+		var record models.URLRecord
 		if err := decoder.Decode(&record); err != nil {
 			if err == io.EOF {
 				break
@@ -117,7 +120,7 @@ func LoadURLsFromFile(filename string, logger zap.SugaredLogger) error {
 			continue // Пропускаем некорректные записи (но логируем их)
 		}
 
-		// Записываем в store
+		// Записываем в память
 		mu.Lock()
 		store.URLStore[record.ShortURL] = record.OriginalURL
 
