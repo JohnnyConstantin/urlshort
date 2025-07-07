@@ -49,20 +49,14 @@ func main() {
 			app.GzipHandle( // Сжатие
 				app.WithLogging( // Логирование, прокидываем в него регистратор логов sugar
 					handler.GetHandler, sugar))) // Сам хендлер
+		r.Get("/ping",
+			handler.PingDBHandler) // Сам хендлер
 	})
 
 	flag.Parse()
 
-	//Подгружаем переменные окружения при наличии
-	if envA := os.Getenv("SERVER_ADDRESS"); envA != "" {
-		config.Options.Address = envA
-	}
-	if envB := os.Getenv("BASE_URL"); envB != "" {
-		config.Options.BaseAddress = envB
-	}
-	if envC := os.Getenv("FILE_STORAGE_PATH"); envC != "" {
-		config.Options.FileToWrite = envC
-	}
+	// Вынес загрузку переменных окружения в отдельную функцию
+	loadEnvs()
 
 	// записываем в лог, что сервер запускается
 	sugar.Infow(
@@ -141,5 +135,22 @@ func JSONResponseMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		if rw.body.Len() > 0 {
 			w.Write(rw.body.Bytes())
 		}
+	}
+}
+
+func loadEnvs() {
+	//Подгружаем переменные окружения при наличии
+	if envA := os.Getenv("SERVER_ADDRESS"); envA != "" {
+		config.Options.Address = envA
+	}
+	if envB := os.Getenv("BASE_URL"); envB != "" {
+		config.Options.BaseAddress = envB
+	}
+	if envC := os.Getenv("FILE_STORAGE_PATH"); envC != "" {
+		config.Options.FileToWrite = envC
+	}
+
+	if envD := os.Getenv("DATABASE_DSN"); envD != "" {
+		config.Options.FileToWrite = envD
 	}
 }

@@ -2,10 +2,13 @@ package app
 
 import (
 	"compress/gzip"
+	"database/sql"
 	"encoding/json"
+	"fmt"
+	"github.com/JohnnyConstantin/urlshort/internal/config"
 	"github.com/JohnnyConstantin/urlshort/internal/store"
 	"github.com/JohnnyConstantin/urlshort/models"
-	_ "github.com/lib/pq"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"io"
 	"net/http"
 	"strings"
@@ -123,4 +126,21 @@ func GzipHandle(next http.HandlerFunc) http.HandlerFunc {
 
 		next(originalWriter, r) // перекидываем дальше
 	}
+}
+
+func (h *Handler) PingDBHandler(w http.ResponseWriter, r *http.Request) {
+	dsn := config.Options.DSN
+	fmt.Println(dsn)
+	db, err := sql.Open("pgx", dsn)
+	if err != nil {
+		http.Error(w, store.ConnectionError, store.InternalSeverErrorCode)
+	}
+	defer db.Close()
+
+	err = db.Ping()
+	if err != nil {
+		http.Error(w, store.ConnectionError, store.InternalSeverErrorCode)
+	}
+
+	w.WriteHeader(http.StatusOK)
 }

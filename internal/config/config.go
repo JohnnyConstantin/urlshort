@@ -11,6 +11,7 @@ var (
 var Options struct {
 	Address     string
 	BaseAddress string
+	DSN         string
 	FileToWrite string
 }
 
@@ -30,5 +31,11 @@ func init() {
 		"f",
 		"log.log",
 		"File to write logs",
+	)
+	flag.StringVar( // Странно, что локальные тесты намекают на необходимость этого флага в 6 инкременте, а реально появится он только в 9
+		&Options.DSN,
+		"d",
+		"postgres://postgres:postgres@localhost:5432/test?sslmode=disable",
+		"Database connection string",
 	)
 }
