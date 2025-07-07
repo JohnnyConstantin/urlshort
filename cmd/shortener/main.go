@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"github.com/JohnnyConstantin/urlshort/internal/app"
 	"github.com/JohnnyConstantin/urlshort/internal/config"
 	"github.com/JohnnyConstantin/urlshort/internal/store"
@@ -37,14 +38,23 @@ func main() {
 	router.Route("/", func(r route.Router) {
 		r.Post("/",
 			app.GzipHandle( // Сжатие
-				app.WithLogging( // Логирование, прокидываем в него регистратор логов sugar
-					handler.PostHandler, sugar))) // Сам хендлер
+				app.WithLogging(
+					JSONResponseMiddleware( // Логирование, прокидываем в него регистратор логов sugar
+						handler.PostHandler), sugar))) // Сам хендлер
 		r.Route("/api", func(r route.Router) {
-			r.Post("/shorten",
-				app.GzipHandle( // Сжатие
-					app.WithLogging( // Логирование, прокидываем в него регистратор логов sugar
-						JSONResponseMiddleware( // Работа с json request/response
-							handler.PostHandler), sugar))) // Сам хендлер
+			r.Route("/shorten", func(r route.Router) {
+				r.Post("/",
+					app.GzipHandle( // Сжатие
+						app.WithLogging( // Логирование, прокидываем в него регистратор логов sugar
+							JSONResponseMiddleware( // Работа с json request/response
+								handler.PostHandler), sugar))) // Сам хендлер
+				r.Post("/batch",
+					app.GzipHandle( // Сжатие
+						app.WithLogging( // Логирование, прокидываем в него регистратор логов sugar
+							JSONResponseMiddleware( // Работа с json request/response
+								handler.PostHandlerMultiple), sugar))) // Сам хендлер
+
+			})
 		})
 		r.Get("/{id}",
 			app.GzipHandle( // Сжатие
@@ -156,19 +166,24 @@ func JSONResponseMiddleware(next http.HandlerFunc) http.HandlerFunc {
 
 		// Если это JSON ответ - обрабатываем
 		if rw.Header().Get("Content-Type") == "application/json" {
-			response := models.ShortenResponse{
-				Result: rw.body.String(),
+			if rw.body.Len() > 0 {
+				w.WriteHeader(rw.statusCode)
+				w.Write(rw.body.Bytes())
 			}
-			w.WriteHeader(rw.statusCode)
-			json.NewEncoder(w).Encode(response)
 			return
 		}
 
-		// Для не-JSON ответов просто копируем тело и статус код
+		fmt.Println(rw.body.String())
+
+		// Для не-JSON ответов вытаскиваем ответ и преобразуем в plain-text
 		w.WriteHeader(rw.statusCode)
-		if rw.body.Len() > 0 {
-			w.Write(rw.body.Bytes())
+		response := models.ShortenResponse{}
+		err := json.Unmarshal(rw.body.Bytes(), &response)
+		if err != nil {
+			return
 		}
+		fmt.Println(response.Result)
+		w.Write([]byte(response.Result))
 	}
 }
 

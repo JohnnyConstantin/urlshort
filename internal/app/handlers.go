@@ -117,7 +117,88 @@ func (h *Handler) PostHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusCreated)
-	w.Write([]byte(ShortURL.Result))
+	json.NewEncoder(w).Encode(ShortURL)
+}
+
+// PostHandlerMultiple обрабатывает POST запросы с batch
+func (h *Handler) PostHandlerMultiple(w http.ResponseWriter, r *http.Request) {
+	var requests []models.BatchShortenRequest
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, store.ReadBodyError, store.DefaultErrorCode)
+		return
+	}
+	defer r.Body.Close()
+
+	// Доп. обработка тела
+	// Ограничиваем размер тела запроса
+	if len(body) > 1024*1024 { // 1MB
+		http.Error(w, store.LargeBodyError, store.DefaultErrorCode)
+		return
+	}
+
+	if err := json.Unmarshal(body, &requests); err != nil {
+		http.Error(w, "Invalid batch request format", store.DefaultErrorCode)
+		return
+	}
+
+	responses := make([]models.BatchShortenResponse, 0, len(requests))
+	cfg := config.GetStorageConfig()
+
+	switch cfg.StorageType {
+	case config.StorageFile:
+		shortener := FileShortener{cfg}
+		for _, req := range requests {
+			ShortURL := shortener.ShortenURL(req.OriginalURL)
+			if err != nil {
+				http.Error(w, store.DefaultError, store.InternalSeverErrorCode)
+				return
+			}
+
+			responses = append(responses, models.BatchShortenResponse{
+				CorrelationID: req.CorrelationID,
+				ShortURL:      ShortURL.Result,
+			})
+		}
+
+	case config.StorageMemory:
+		shortener := MemoryShortener{cfg}
+		for _, req := range requests {
+			ShortURL := shortener.ShortenURL(req.OriginalURL)
+			if err != nil {
+				http.Error(w, store.DefaultError, store.InternalSeverErrorCode)
+				return
+			}
+
+			responses = append(responses, models.BatchShortenResponse{
+				CorrelationID: req.CorrelationID,
+				ShortURL:      ShortURL.Result,
+			})
+		}
+	case config.StorageDB:
+		shortener := DBShortener{cfg}
+		for _, req := range requests {
+			ShortURL := shortener.ShortenURL(req.OriginalURL)
+			if err != nil {
+				http.Error(w, store.DefaultError, store.InternalSeverErrorCode)
+				return
+			}
+
+			responses = append(responses, models.BatchShortenResponse{
+				CorrelationID: req.CorrelationID,
+				ShortURL:      ShortURL.Result,
+			})
+		}
+	default: // Overkill, но перестраховаться нужно
+		http.Error(w, store.DefaultError, store.DefaultErrorCode)
+	}
+
+	w.WriteHeader(http.StatusCreated)
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(responses); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+	}
 }
 
 func GzipHandle(next http.HandlerFunc) http.HandlerFunc {
