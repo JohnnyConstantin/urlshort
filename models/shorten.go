@@ -5,6 +5,14 @@ type ShortenRequest struct {
 	URL string `json:"url"`
 }
 
+// URLRecord Объект, хранящийся в файле-хранилище запросов. В идеальном мире должен быть заменен на URLResponse,
+// потому что при использовании СУБД поле uuid заменяется на auto increment PK.
+type URLRecord struct {
+	UUID        string `json:"uuid"`
+	ShortURL    string `json:"short_url"`
+	OriginalURL string `json:"original_url"`
+}
+
 // ShortenResponse Объект, содержащий сокращенный URL
 type ShortenResponse struct {
 	Result string `json:"result"`

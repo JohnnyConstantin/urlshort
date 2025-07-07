@@ -1,44 +1,22 @@
 package app
 
 import (
-	"github.com/JohnnyConstantin/urlshort/internal/config"
-	"github.com/JohnnyConstantin/urlshort/internal/store"
-	"github.com/JohnnyConstantin/urlshort/models"
-	"github.com/google/uuid"
-	"sync"
+	"io"
+	"net/http"
+	"strings"
 )
 
-var (
-	mu sync.RWMutex
-)
-
-// Используется для получения короткого URL, используя полный
-func shortenURL(originalURL string) models.ShortenResponse {
-	var ShortenURL models.ShortenResponse
-
-	shortID := uuid.New().String()[:8]
-
-	//Оверкилл, но в будущем может пригодиться при использовании горутин на хендлерах
-	mu.Lock()
-	store.URLStore[shortID] = originalURL
-	mu.Unlock()
-
-	ShortenURL.Result = config.Options.BaseAddress + "/" + shortID
-
-	return ShortenURL
+type gzipWriter struct {
+	http.ResponseWriter
+	Writer io.Writer
 }
 
-// Используется для получения полного URL, используя короткий
-func getFullURL(shortID string) (models.ShortenRequest, bool) {
-	Result := models.ShortenRequest{URL: ""}
-
-	//Оверкилл, но в будущем может пригодиться при использовании горутин на хендлерах
-	mu.RLock()
-	defer mu.RUnlock()
-	originalURL, exists := store.URLStore[shortID]
-	if exists {
-		Result.URL = originalURL
-		return Result, exists
+func (g *gzipWriter) Write(b []byte) (int, error) {
+	contentType := g.Header().Get("Content-Type")
+	// Дополнительная проверка здесь, на случай если в одном из middleware хендлеров в дальнейшем будет изменяться contentType
+	if strings.HasPrefix(contentType, "application/json") ||
+		strings.HasPrefix(contentType, "text/html") {
+		return g.Writer.Write(b)
 	}
-	return Result, exists
+	return g.ResponseWriter.Write(b)
 }
