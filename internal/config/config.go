@@ -82,8 +82,6 @@ func CreateStorageConfig() {
 	Config = StorageConfig{
 		StorageType: StorageMemory,
 	}
-
-	return
 }
 
 func GetStorageConfig() StorageConfig {
