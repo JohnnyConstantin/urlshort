@@ -2,9 +2,7 @@ package app
 
 import (
 	"compress/gzip"
-	"database/sql"
 	"encoding/json"
-	"fmt"
 	"github.com/JohnnyConstantin/urlshort/internal/config"
 	"github.com/JohnnyConstantin/urlshort/internal/store"
 	"github.com/JohnnyConstantin/urlshort/models"
@@ -35,6 +33,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // GetHandler обрабатывает GET запросы
 func (h *Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
 	response := models.ShortenRequest{URL: ""}
+	exists := false //By default не существует
 	path := strings.Trim(r.URL.Path, "/")
 	parts := strings.Split(path, "/")
 
@@ -45,7 +44,22 @@ func (h *Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
 
 	id := parts[0]
 
-	response, exists := getFullURL(id)
+	cfg := config.GetStorageConfig()
+
+	switch cfg.StorageType {
+	case config.StorageFile:
+		fuller := FileFuller{cfg}
+		response, exists = fuller.GetFullURL(id)
+	case config.StorageMemory:
+		fuller := MemoryFuller{cfg}
+		response, exists = fuller.GetFullURL(id)
+	case config.StorageDB:
+		fuller := DBFuller{cfg}
+		response, exists = fuller.GetFullURL(id)
+	default: // Overkill, но перестраховаться нужно
+		http.Error(w, store.DefaultError, store.DefaultErrorCode)
+	}
+
 	if !exists {
 		http.Error(w, store.DefaultError, store.DefaultErrorCode)
 	}
@@ -86,7 +100,21 @@ func (h *Handler) PostHandler(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain")
 	}
 
-	ShortURL = shortenURL(OriginalURL.URL)
+	cfg := config.GetStorageConfig()
+
+	switch cfg.StorageType {
+	case config.StorageFile:
+		shortener := FileShortener{cfg}
+		ShortURL = shortener.ShortenURL(OriginalURL.URL)
+	case config.StorageMemory:
+		shortener := MemoryShortener{cfg}
+		ShortURL = shortener.ShortenURL(OriginalURL.URL)
+	case config.StorageDB:
+		shortener := DBShortener{cfg}
+		ShortURL = shortener.ShortenURL(OriginalURL.URL)
+	default: // Overkill, но перестраховаться нужно
+		http.Error(w, store.DefaultError, store.DefaultErrorCode)
+	}
 
 	w.WriteHeader(http.StatusCreated)
 	w.Write([]byte(ShortURL.Result))
@@ -128,16 +156,17 @@ func GzipHandle(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
+// PingDBHandler Проверяет подключение к БД
 func (h *Handler) PingDBHandler(w http.ResponseWriter, r *http.Request) {
 	dsn := config.Options.DSN
-	fmt.Println(dsn)
-	db, err := sql.Open("pgx", dsn)
+	dbConn, err := GetDBConnection(dsn)
 	if err != nil {
 		http.Error(w, store.ConnectionError, store.InternalSeverErrorCode)
 	}
-	defer db.Close()
 
-	err = db.Ping()
+	defer dbConn.Close()
+
+	err = dbConn.Ping()
 	if err != nil {
 		http.Error(w, store.ConnectionError, store.InternalSeverErrorCode)
 	}

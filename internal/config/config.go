@@ -1,6 +1,16 @@
 package config
 
-import "flag"
+import (
+	"flag"
+)
+
+type StorageType string
+
+const (
+	StorageMemory StorageType = "memory"
+	StorageFile   StorageType = "file"
+	StorageDB     StorageType = "postgres"
+)
 
 var (
 	AppName   = "shortener" // В дальнейшем может использоваться для CLI интерфейса
@@ -13,6 +23,14 @@ var Options struct {
 	BaseAddress string
 	DSN         string
 	FileToWrite string
+}
+
+var Config StorageConfig
+
+type StorageConfig struct {
+	StorageType StorageType
+	DatabaseDSN string // DSN для PostgreSQL (опциональное)
+	FilePath    string // Путь к файлу (опциональное)
 }
 
 func init() {
@@ -29,13 +47,45 @@ func init() {
 	flag.StringVar( // Странно, что локальные тесты намекают на необходимость этого флага в 6 инкременте, а реально появится он только в 9
 		&Options.FileToWrite,
 		"f",
-		"log.log",
+		"",
 		"File to write logs",
 	)
-	flag.StringVar( // Странно, что локальные тесты намекают на необходимость этого флага в 6 инкременте, а реально появится он только в 9
+	flag.StringVar( // DSN к БД
 		&Options.DSN,
 		"d",
-		"postgres://postgres:postgres@localhost:5432/test?sslmode=disable",
+		"",
 		"Database connection string",
 	)
+}
+
+// CreateStorageConfig В зависимости от переданых параметров устанавливает StorageType для всего приложения
+func CreateStorageConfig() {
+
+	if Options.DSN != "" {
+		Config = StorageConfig{
+			StorageType: StorageDB,
+			DatabaseDSN: Options.DSN,
+		}
+		return
+	}
+
+	// Fallback до StorageFile в случае, если СУБД не обнаружено
+	if Options.FileToWrite != "" {
+		Config = StorageConfig{
+			StorageType: StorageFile,
+			FilePath:    Options.FileToWrite,
+		}
+		return
+	}
+
+	// Fallback до inMemory в случае, если файл не обнаружен
+	Config = StorageConfig{
+		StorageType: StorageMemory,
+	}
+
+	return
+}
+
+func GetStorageConfig() StorageConfig {
+	return Config
 }

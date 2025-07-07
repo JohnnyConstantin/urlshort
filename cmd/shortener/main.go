@@ -6,6 +6,7 @@ import (
 	"flag"
 	"github.com/JohnnyConstantin/urlshort/internal/app"
 	"github.com/JohnnyConstantin/urlshort/internal/config"
+	"github.com/JohnnyConstantin/urlshort/internal/store"
 	"github.com/JohnnyConstantin/urlshort/models"
 	route "github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
@@ -64,13 +65,46 @@ func main() {
 		"addr", config.Options.Address,
 	)
 
-	// Подгружаем URL из файла-хранилища в память-хранилище
-	// При большой нагрузке это так себе решение, потому что съедим кучу оперативы, но для PoC - acceptable :)
-	// В проде в любом случае необходимо использовать реальную СУБД, а не файлы/memory storage
-	err = app.LoadURLsFromFile(config.Options.FileToWrite, sugar)
-	if err != nil {
-		return
+	// Вызываем резолвер способа хранения данных
+	config.CreateStorageConfig()
+	cfg := config.GetStorageConfig()
+
+	//Логируем какой StorageType будет использован, для in-memory выполняем операцию по восстановлению из файла
+	switch cfg.StorageType {
+	case config.StorageDB:
+		// Проверяем насколько верный DSN
+		db, err := app.GetDBConnection(config.Options.DSN)
+		if err != nil {
+			sugar.Error("Could not connect to database")
+			return
+		}
+		defer db.Close()
+
+		// Создаем таблицу (если ее нет)
+		if err := store.InitDB(db); err != nil {
+			sugar.Error("Could not initialize database")
+			return
+		}
+
+		sugar.Infow("Using PostgreSQL as a storage",
+			"DSN", config.Options.DSN)
+
+	case config.StorageFile:
+		sugar.Infow("Using file as a storage",
+			"file", config.Options.FileToWrite)
+
+		// Подгружаем URL из файла-хранилища в память-хранилище
+		// При большой нагрузке это так себе решение, потому что съедим кучу оперативы, но для PoC - acceptable :)
+		// Вариант с "постоянно дергать файл на Read/Write операции" без использования in-Memory показался совсем варварским
+		err = app.LoadURLsFromFile(config.Options.FileToWrite, sugar)
+		if err != nil {
+			return
+		}
+	default:
+		//Только логируем, никаких доп.действий не требуется, все реализовано через проверку StorageType в целевых функциях
+		sugar.Infow("Using memory storage (no persistence)")
 	}
+
 	err = http.ListenAndServe(config.Options.Address, router)
 	if err != nil {
 		return
@@ -151,6 +185,6 @@ func loadEnvs() {
 	}
 
 	if envD := os.Getenv("DATABASE_DSN"); envD != "" {
-		config.Options.FileToWrite = envD
+		config.Options.DSN = envD
 	}
 }

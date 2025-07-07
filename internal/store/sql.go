@@ -1,94 +1,65 @@
 package store
 
-//Работает с локальными тестами, но через CI не проходит, потому что контейнер с постгрес не создает
-//необходимую базу и таблицы, а также (судя по всему) в volume контейнера не закидывается .env файл
-//поэтому... Вместо бд используется memory.go
-
 import (
+	"context"
 	"database/sql"
+	"errors"
 	"fmt"
-	"github.com/JohnnyConstantin/urlshort/internal/config"
 	"github.com/JohnnyConstantin/urlshort/models"
-	"github.com/google/uuid"
-	"github.com/joho/godotenv"
-	"log"
-	"os"
 )
 
-func GetDB() (*sql.DB, error) {
-
-	//Вгружаем переменные окружения, в т.ч. креды для бд
-	err := godotenv.Load(config.PathToENV)
+func InitDB(db *sql.DB) error {
+	query := `
+	CREATE TABLE IF NOT EXISTS urls (
+		id          SERIAL PRIMARY KEY,
+		short_url   VARCHAR(10) UNIQUE NOT NULL,
+		original_url TEXT UNIQUE NOT NULL,
+		created_at  TIMESTAMP DEFAULT NOW()
+	);
+	CREATE INDEX IF NOT EXISTS idx_short_url ON urls(short_url);
+	CREATE INDEX IF NOT EXISTS idx_original_url ON urls(original_url);
+	`
+	_, err := db.ExecContext(context.Background(), query)
 	if err != nil {
-		log.Fatal("Error loading .env file")
+		return fmt.Errorf("failed to create table: %w", err)
 	}
-
-	pgDB := os.Getenv("PG_DATABASE")
-	pgUser := os.Getenv("PG_USER")
-	pgPassword := os.Getenv("PG_PASSWORD")
-	pgHost := os.Getenv("PG_HOST")
-	pgPort := os.Getenv("PG_PORT")
-
-	connStr := fmt.Sprintf("user=%s dbname=%s password=%s host=%s port=%s sslmode=disable",
-		pgUser, pgDB, pgPassword, pgHost, pgPort)
-
-	db, err := sql.Open("postgres", connStr)
-	if err != nil {
-		return nil, err
-	}
-	return db, nil
+	return nil
 }
 
-func IsDuplicate(db *sql.DB, originalURL string) (string, bool) {
-	var existingShortID string
+func Insert(db *sql.DB, record models.URLRecord) (string, error) {
+	shortKey := record.ShortURL
+	originalURL := record.OriginalURL
+
+	// Вставляем запись в БД (если originalURL уже есть, возвращаем существующий shortURL)
+	var existingShortURL string
+	err := db.QueryRow(`
+		INSERT INTO urls (short_url, original_url)
+		VALUES ($1, $2)
+		ON CONFLICT (original_url) DO UPDATE SET original_url = EXCLUDED.original_url
+		RETURNING short_url
+	`, shortKey, originalURL).Scan(&existingShortURL)
+
+	if err != nil {
+		return "", fmt.Errorf("failed to insert URL: %w", err)
+	}
+
+	return existingShortURL, nil
+}
+
+func Read(db *sql.DB, shortID string) (string, bool) {
+	var originalURL string
 
 	err := db.QueryRow(
-		`SELECT short_id FROM urls WHERE original_url = $1 LIMIT 1`,
-		originalURL,
-	).Scan(&existingShortID)
+		`SELECT original_url FROM urls WHERE short_url = $1 LIMIT 1`,
+		shortID,
+	).Scan(&originalURL)
 
-	if err == nil {
-		return existingShortID, true
-	} else {
+	switch {
+	case err == nil:
+		return originalURL, true
+	case errors.Is(err, sql.ErrNoRows):
+		return "", false
+	default:
 		return "", false
 	}
-}
-
-func Insert(db *sql.DB, originalURL string) (string, error) {
-	var result string
-	shortID := uuid.New().String()[:8]
-
-	_, err := db.Exec(
-		"INSERT INTO urls (short_id, original_url) VALUES ($1, $2)",
-		shortID,
-		originalURL,
-	)
-	if err != nil {
-		return "", err
-	}
-
-	result = shortID
-
-	return result, nil
-}
-
-func Read(db *sql.DB, shortID string) (string, error) {
-	var model models.URLResponse
-
-	row := db.QueryRow(
-		`SELECT short_id, original_url 
-		FROM urls 
-		WHERE short_id = $1`,
-		shortID,
-	)
-
-	err := row.Scan(&model.ShortURL, &model.OriginalURL)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return model.OriginalURL, err
-		}
-		return model.OriginalURL, err
-	}
-
-	return model.OriginalURL, nil
 }
