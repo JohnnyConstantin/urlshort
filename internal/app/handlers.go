@@ -116,8 +116,13 @@ func (h *Handler) PostHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, store.DefaultError, store.DefaultErrorCode)
 	}
 
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(ShortURL)
+	if r.Header.Get("Content-Type") == "application/json" {
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(ShortURL)
+	} else {
+		w.WriteHeader(http.StatusCreated)
+		w.Write([]byte(ShortURL.Result))
+	}
 }
 
 // PostHandlerMultiple обрабатывает POST запросы с batch
@@ -182,8 +187,8 @@ func (h *Handler) PostHandlerMultiple(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, store.DefaultError, store.DefaultErrorCode)
 	}
 
-	w.WriteHeader(http.StatusCreated)
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
 	if err := json.NewEncoder(w).Encode(responses); err != nil {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 	}

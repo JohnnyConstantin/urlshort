@@ -41,6 +41,7 @@ func TestPostHandler(t *testing.T) {
 
 // TestGetHandler проверяет хендлер GET запросов
 func TestGetHandler(t *testing.T) {
+	config.CreateStorageConfig()
 	testURL := "https://example.com"
 	var s Server
 	server := s.NewServer()

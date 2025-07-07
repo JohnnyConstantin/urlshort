@@ -1,14 +1,10 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"flag"
-	"fmt"
 	"github.com/JohnnyConstantin/urlshort/internal/app"
 	"github.com/JohnnyConstantin/urlshort/internal/config"
 	"github.com/JohnnyConstantin/urlshort/internal/store"
-	"github.com/JohnnyConstantin/urlshort/models"
 	route "github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
 	"net/http"
@@ -38,21 +34,19 @@ func main() {
 	router.Route("/", func(r route.Router) {
 		r.Post("/",
 			app.GzipHandle( // Сжатие
-				app.WithLogging(
-					JSONResponseMiddleware( // Логирование, прокидываем в него регистратор логов sugar
-						handler.PostHandler), sugar))) // Сам хендлер
+				app.WithLogging( // Логирование, прокидываем в него регистратор логов sugar
+
+					handler.PostHandler, sugar))) // Сам хендлер
 		r.Route("/api", func(r route.Router) {
 			r.Route("/shorten", func(r route.Router) {
 				r.Post("/",
 					app.GzipHandle( // Сжатие
 						app.WithLogging( // Логирование, прокидываем в него регистратор логов sugar
-							JSONResponseMiddleware( // Работа с json request/response
-								handler.PostHandler), sugar))) // Сам хендлер
+							handler.PostHandler, sugar))) // Сам хендлер
 				r.Post("/batch",
 					app.GzipHandle( // Сжатие
 						app.WithLogging( // Логирование, прокидываем в него регистратор логов sugar
-							JSONResponseMiddleware( // Работа с json request/response
-								handler.PostHandlerMultiple), sugar))) // Сам хендлер
+							handler.PostHandlerMultiple, sugar))) // Сам хендлер
 
 			})
 		})
@@ -118,72 +112,6 @@ func main() {
 	err = http.ListenAndServe(config.Options.Address, router)
 	if err != nil {
 		return
-	}
-}
-
-// Кастомный ResponseWriter для перехвата данных в JSONMiddleware
-type responseWriterJSON struct {
-	http.ResponseWriter
-	body       *bytes.Buffer
-	statusCode int
-	header     http.Header
-}
-
-func (rw *responseWriterJSON) WriteHeader(statusCode int) {
-	rw.statusCode = statusCode
-}
-
-func (rw *responseWriterJSON) Write(b []byte) (int, error) {
-	return rw.body.Write(b)
-}
-
-func (rw *responseWriterJSON) Header() http.Header {
-	if rw.header == nil {
-		rw.header = make(http.Header)
-	}
-	return rw.header
-}
-
-// JSONResponseMiddleware Middleware для проверки того, что возвращаемое значение является JSON. Иначе переводит его в JSON.
-// Этот middleware хотелось бы вынести внутрь app в отдельный файл validator.go, но тогда не проходит автотест на импорт json
-// в main.go (а без этого middleware импорт json здесь не нужен)
-func JSONResponseMiddleware(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		// Создаем  ResponseWriterJSON для перехвата ответа
-		rw := &responseWriterJSON{
-			ResponseWriter: w,
-			body:           new(bytes.Buffer),
-			statusCode:     http.StatusCreated, // По умолчанию 201
-		}
-
-		// Вызываем следующий обработчик с ResponseWriterJSON
-		next(rw, r)
-
-		// Копируем заголовки
-		for k, v := range rw.header {
-			w.Header()[k] = v
-		}
-
-		// Если это JSON ответ - обрабатываем
-		if rw.Header().Get("Content-Type") == "application/json" {
-			if rw.body.Len() > 0 {
-				w.WriteHeader(rw.statusCode)
-				w.Write(rw.body.Bytes())
-			}
-			return
-		}
-
-		fmt.Println(rw.body.String())
-
-		// Для не-JSON ответов вытаскиваем ответ и преобразуем в plain-text
-		w.WriteHeader(rw.statusCode)
-		response := models.ShortenResponse{}
-		err := json.Unmarshal(rw.body.Bytes(), &response)
-		if err != nil {
-			return
-		}
-		fmt.Println(response.Result)
-		w.Write([]byte(response.Result))
 	}
 }
 
