@@ -151,10 +151,6 @@ func (h *Handler) PostHandlerMultiple(w http.ResponseWriter, r *http.Request) {
 		shortener := FileShortener{cfg}
 		for _, req := range requests {
 			ShortURL := shortener.ShortenURL(req.OriginalURL)
-			if err != nil {
-				http.Error(w, store.DefaultError, store.InternalSeverErrorCode)
-				return
-			}
 
 			responses = append(responses, models.BatchShortenResponse{
 				CorrelationID: req.CorrelationID,
@@ -166,10 +162,6 @@ func (h *Handler) PostHandlerMultiple(w http.ResponseWriter, r *http.Request) {
 		shortener := MemoryShortener{cfg}
 		for _, req := range requests {
 			ShortURL := shortener.ShortenURL(req.OriginalURL)
-			if err != nil {
-				http.Error(w, store.DefaultError, store.InternalSeverErrorCode)
-				return
-			}
 
 			responses = append(responses, models.BatchShortenResponse{
 				CorrelationID: req.CorrelationID,
@@ -180,10 +172,6 @@ func (h *Handler) PostHandlerMultiple(w http.ResponseWriter, r *http.Request) {
 		shortener := DBShortener{cfg}
 		for _, req := range requests {
 			ShortURL := shortener.ShortenURL(req.OriginalURL)
-			if err != nil {
-				http.Error(w, store.DefaultError, store.InternalSeverErrorCode)
-				return
-			}
 
 			responses = append(responses, models.BatchShortenResponse{
 				CorrelationID: req.CorrelationID,
