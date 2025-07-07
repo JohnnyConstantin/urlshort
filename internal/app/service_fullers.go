@@ -24,10 +24,10 @@ func (f *DBFuller) GetFullURL(shortID string) (models.ShortenRequest, bool) {
 	fmt.Println("Fulling URL with DB: ", shortID)
 
 	db, err := GetDBConnection(config.Options.DSN)
-	defer db.Close()
 	if err != nil {
 		return Result, false
 	}
+	defer db.Close()
 
 	originalURL, exists := store.Read(db, shortID)
 	if exists {
