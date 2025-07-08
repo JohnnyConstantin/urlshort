@@ -30,6 +30,30 @@ func main() {
 
 	sugar = *logger.Sugar() // Создали экземпляр и в дальнейшем прокидываем его в middleware с логированием
 
+	// Вынес создание роутов в отдельную функцию
+	createHandlers(router, sugar, handler)
+
+	flag.Parse()
+
+	// Вынес загрузку переменных окружения в отдельную функцию
+	loadEnvs()
+
+	// записываем в лог, что сервер запускается
+	sugar.Infow(
+		"Starting server",
+		"addr", config.Options.Address,
+	)
+
+	// Создание и применение конфигурации
+	storageDecider()
+
+	err = http.ListenAndServe(config.Options.Address, router)
+	if err != nil {
+		return
+	}
+}
+
+func createHandlers(router *route.Mux, sugar zap.SugaredLogger, handler *app.Handler) {
 	//Накидываем хендлеры на роуты
 	router.Route("/", func(r route.Router) {
 		r.Post("/",
@@ -56,23 +80,31 @@ func main() {
 		r.Get("/ping",
 			handler.PingDBHandler) // Сам хендлер
 	})
+}
 
-	flag.Parse()
+func loadEnvs() {
+	//Подгружаем переменные окружения при наличии
+	if envA := os.Getenv("SERVER_ADDRESS"); envA != "" {
+		config.Options.Address = envA
+	}
+	if envB := os.Getenv("BASE_URL"); envB != "" {
+		config.Options.BaseAddress = envB
+	}
+	if envC := os.Getenv("FILE_STORAGE_PATH"); envC != "" {
+		config.Options.FileToWrite = envC
+	}
 
-	// Вынес загрузку переменных окружения в отдельную функцию
-	loadEnvs()
+	if envD := os.Getenv("DATABASE_DSN"); envD != "" {
+		config.Options.DSN = envD
+	}
+}
 
-	// записываем в лог, что сервер запускается
-	sugar.Infow(
-		"Starting server",
-		"addr", config.Options.Address,
-	)
-
+func storageDecider() {
 	// Вызываем резолвер способа хранения данных
 	config.CreateStorageConfig()
 	cfg := config.GetStorageConfig()
 
-	//Логируем какой StorageType будет использован, для in-memory выполняем операцию по восстановлению из файла
+	//Логируем какой StorageType будет использован, для FileMemory выполняем операцию по восстановлению из файла
 	switch cfg.StorageType {
 	case config.StorageDB:
 		// Проверяем насколько верный DSN
@@ -99,34 +131,12 @@ func main() {
 		// Подгружаем URL из файла-хранилища в память-хранилище
 		// При большой нагрузке это так себе решение, потому что съедим кучу оперативы, но для PoC - acceptable :)
 		// Вариант с "постоянно дергать файл на Read/Write операции" без использования in-Memory показался совсем варварским
-		err = app.LoadURLsFromFile(config.Options.FileToWrite, sugar)
+		err := app.LoadURLsFromFile(config.Options.FileToWrite, sugar)
 		if err != nil {
 			return
 		}
 	default:
 		//Только логируем, никаких доп.действий не требуется, все реализовано через проверку StorageType в целевых функциях
 		sugar.Infow("Using memory storage (no persistence)")
-	}
-
-	err = http.ListenAndServe(config.Options.Address, router)
-	if err != nil {
-		return
-	}
-}
-
-func loadEnvs() {
-	//Подгружаем переменные окружения при наличии
-	if envA := os.Getenv("SERVER_ADDRESS"); envA != "" {
-		config.Options.Address = envA
-	}
-	if envB := os.Getenv("BASE_URL"); envB != "" {
-		config.Options.BaseAddress = envB
-	}
-	if envC := os.Getenv("FILE_STORAGE_PATH"); envC != "" {
-		config.Options.FileToWrite = envC
-	}
-
-	if envD := os.Getenv("DATABASE_DSN"); envD != "" {
-		config.Options.DSN = envD
 	}
 }

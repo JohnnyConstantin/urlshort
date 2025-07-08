@@ -119,6 +119,7 @@ func (h *Handler) PostHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, store.DefaultError, store.DefaultErrorCode)
 	}
 
+	// Перенесенный функционал из JsonMiddleware. Необходимо для применения статус кода и json encoding для app/json Header
 	if r.Header.Get("Content-Type") == "application/json" {
 		w.WriteHeader(status)
 		json.NewEncoder(w).Encode(ShortURL)

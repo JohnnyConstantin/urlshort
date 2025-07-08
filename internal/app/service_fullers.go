@@ -5,18 +5,22 @@ import (
 	"github.com/JohnnyConstantin/urlshort/internal/config"
 	"github.com/JohnnyConstantin/urlshort/internal/store"
 	"github.com/JohnnyConstantin/urlshort/models"
+	"sync"
 )
 
 type DBFuller struct {
+	mu  sync.RWMutex
 	cfg config.StorageConfig
 }
 
 type FileFuller struct {
 	cfg config.StorageConfig
+	mu  sync.RWMutex
 }
 
 type MemoryFuller struct {
 	cfg config.StorageConfig
+	mu  sync.RWMutex
 }
 
 func (f *DBFuller) GetFullURL(shortID string) (models.ShortenRequest, bool) {
@@ -41,8 +45,8 @@ func (f *DBFuller) GetFullURL(shortID string) (models.ShortenRequest, bool) {
 func (f *FileFuller) GetFullURL(shortID string) (models.ShortenRequest, bool) {
 	Result := models.ShortenRequest{URL: ""}
 
-	mu.RLock()
-	defer mu.RUnlock()
+	f.mu.RLock()
+	defer f.mu.RUnlock()
 	originalURL, exists := store.URLStore[shortID]
 	if exists {
 		Result.URL = originalURL
@@ -54,8 +58,8 @@ func (f *FileFuller) GetFullURL(shortID string) (models.ShortenRequest, bool) {
 func (f *MemoryFuller) GetFullURL(shortID string) (models.ShortenRequest, bool) {
 	Result := models.ShortenRequest{URL: ""}
 
-	mu.RLock()
-	defer mu.RUnlock()
+	f.mu.RLock()
+	defer f.mu.RUnlock()
 	originalURL, exists := store.URLStore[shortID]
 	if exists {
 		Result.URL = originalURL

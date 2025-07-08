@@ -6,18 +6,22 @@ import (
 	"github.com/JohnnyConstantin/urlshort/internal/store"
 	"github.com/JohnnyConstantin/urlshort/models"
 	"github.com/google/uuid"
+	"sync"
 )
 
 type DBShortener struct {
 	cfg config.StorageConfig
+	mu  sync.RWMutex
 }
 
 type FileShortener struct {
 	cfg config.StorageConfig
+	mu  sync.RWMutex
 }
 
 type MemoryShortener struct {
 	cfg config.StorageConfig
+	mu  sync.RWMutex
 }
 
 func (s *DBShortener) ShortenURL(originalURL string) (models.ShortenResponse, int) {
@@ -63,13 +67,13 @@ func (s *FileShortener) ShortenURL(originalURL string) models.ShortenResponse {
 		OriginalURL: originalURL,
 	}
 
-	mu.Lock()
+	s.mu.Lock()
 	store.URLStore[shortID] = originalURL // сохраняем в память
 	err := SaveToFile(record)             // сохраняем в файл
 	if err != nil {
 		return models.ShortenResponse{}
 	}
-	mu.Unlock()
+	s.mu.Unlock()
 
 	ShortenURL.Result = config.Options.BaseAddress + "/" + shortID
 
@@ -81,9 +85,9 @@ func (s *MemoryShortener) ShortenURL(originalURL string) models.ShortenResponse 
 
 	shortID := uuid.New().String()[:8]
 
-	mu.Lock()
+	s.mu.Lock()
 	store.URLStore[shortID] = originalURL // сохраняем в память
-	mu.Unlock()
+	s.mu.Unlock()
 
 	ShortenURL.Result = config.Options.BaseAddress + "/" + shortID
 

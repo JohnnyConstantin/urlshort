@@ -9,6 +9,7 @@ import (
 	"net/http"
 )
 
+// InitDB создает базу данных, если ее нет
 func InitDB(db *sql.DB) error {
 	query := `
 	CREATE TABLE IF NOT EXISTS urls (
@@ -27,6 +28,7 @@ func InitDB(db *sql.DB) error {
 	return nil
 }
 
+// Insert вставляет originalURL и shortKey в БД
 func Insert(db *sql.DB, record models.URLRecord) (string, int, error) {
 	var existingShortURL string
 	var status int
@@ -60,6 +62,7 @@ func Insert(db *sql.DB, record models.URLRecord) (string, int, error) {
 	return existingShortURL, status, nil
 }
 
+// Read Вычитывает original_url по shortID
 func Read(db *sql.DB, shortID string) (string, bool) {
 	var originalURL string
 

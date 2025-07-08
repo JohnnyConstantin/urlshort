@@ -3,11 +3,6 @@ package app
 import (
 	"database/sql"
 	"github.com/JohnnyConstantin/urlshort/models"
-	"sync"
-)
-
-var (
-	mu sync.RWMutex
 )
 
 // Shortener интерфейс для разных функций бизнес-логики в зависимости от используемого StorageType

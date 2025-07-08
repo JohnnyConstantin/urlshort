@@ -71,11 +71,9 @@ func LoadURLsFromFile(filename string, logger zap.SugaredLogger) error {
 		}
 
 		// Записываем в память
-		mu.Lock()
 		store.URLStore[record.ShortURL] = record.OriginalURL
 
 		logger.Infoln("Added to memory: " + store.URLStore[record.ShortURL])
-		mu.Unlock()
 	}
 
 	return nil
