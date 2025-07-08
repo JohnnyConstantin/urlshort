@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 )
 
 type Handler struct {
@@ -45,16 +46,17 @@ func (h *Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
 	id := parts[0]
 
 	cfg := config.GetStorageConfig()
+	mu := *new(sync.RWMutex)
 
 	switch cfg.StorageType {
 	case config.StorageFile:
-		fuller := FileFuller{cfg}
+		fuller := FileFuller{cfg, mu}
 		response, exists = fuller.GetFullURL(id)
 	case config.StorageMemory:
-		fuller := MemoryFuller{cfg}
+		fuller := MemoryFuller{cfg, mu}
 		response, exists = fuller.GetFullURL(id)
 	case config.StorageDB:
-		fuller := DBFuller{cfg}
+		fuller := DBFuller{cfg, mu}
 		response, exists = fuller.GetFullURL(id)
 	default: // Overkill, но перестраховаться нужно
 		http.Error(w, store.DefaultError, store.DefaultErrorCode)
@@ -102,18 +104,18 @@ func (h *Handler) PostHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cfg := config.GetStorageConfig()
-
+	mu := *new(sync.RWMutex)
 	switch cfg.StorageType {
 	case config.StorageFile:
-		shortener := FileShortener{cfg}
+		shortener := FileShortener{cfg, mu}
 		status = http.StatusCreated
 		ShortURL = shortener.ShortenURL(OriginalURL.URL)
 	case config.StorageMemory:
-		shortener := MemoryShortener{cfg}
+		shortener := MemoryShortener{cfg, mu}
 		status = http.StatusCreated
 		ShortURL = shortener.ShortenURL(OriginalURL.URL)
 	case config.StorageDB:
-		shortener := DBShortener{cfg}
+		shortener := DBShortener{cfg, mu}
 		ShortURL, status = shortener.ShortenURL(OriginalURL.URL)
 	default: // Overkill, но перестраховаться нужно
 		http.Error(w, store.DefaultError, store.DefaultErrorCode)
@@ -156,10 +158,11 @@ func (h *Handler) PostHandlerMultiple(w http.ResponseWriter, r *http.Request) {
 
 	responses := make([]models.BatchShortenResponse, 0, len(requests))
 	cfg := config.GetStorageConfig()
+	mu := *new(sync.RWMutex)
 
 	switch cfg.StorageType {
 	case config.StorageFile:
-		shortener := FileShortener{cfg}
+		shortener := FileShortener{cfg, mu}
 		for _, req := range requests {
 			ShortURL = shortener.ShortenURL(req.OriginalURL)
 			status = http.StatusCreated
@@ -171,7 +174,7 @@ func (h *Handler) PostHandlerMultiple(w http.ResponseWriter, r *http.Request) {
 		}
 
 	case config.StorageMemory:
-		shortener := MemoryShortener{cfg}
+		shortener := MemoryShortener{cfg, mu}
 		for _, req := range requests {
 			ShortURL = shortener.ShortenURL(req.OriginalURL)
 			status = http.StatusCreated
@@ -182,7 +185,7 @@ func (h *Handler) PostHandlerMultiple(w http.ResponseWriter, r *http.Request) {
 			})
 		}
 	case config.StorageDB:
-		shortener := DBShortener{cfg}
+		shortener := DBShortener{cfg, mu}
 		for _, req := range requests {
 			ShortURL, status = shortener.ShortenURL(req.OriginalURL)
 

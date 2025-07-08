@@ -9,8 +9,8 @@ import (
 )
 
 type DBFuller struct {
-	mu  sync.RWMutex
 	cfg config.StorageConfig
+	mu  sync.RWMutex
 }
 
 type FileFuller struct {
