@@ -35,7 +35,6 @@ func main() {
 		r.Post("/",
 			app.GzipHandle( // Сжатие
 				app.WithLogging( // Логирование, прокидываем в него регистратор логов sugar
-
 					handler.PostHandler, sugar))) // Сам хендлер
 		r.Route("/api", func(r route.Router) {
 			r.Route("/shorten", func(r route.Router) {

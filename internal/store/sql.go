@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/JohnnyConstantin/urlshort/models"
+	"net/http"
 )
 
 func InitDB(db *sql.DB) error {
@@ -26,24 +27,37 @@ func InitDB(db *sql.DB) error {
 	return nil
 }
 
-func Insert(db *sql.DB, record models.URLRecord) (string, error) {
+func Insert(db *sql.DB, record models.URLRecord) (string, int, error) {
+	var existingShortURL string
+	var status int
 	shortKey := record.ShortURL
 	originalURL := record.OriginalURL
 
-	// Вставляем запись в БД (если originalURL уже есть, возвращаем существующий shortURL)
-	var existingShortURL string
+	// Вставляем запись в БД (если OriginalURL уже есть, возвращаем существующий shortURL)
 	err := db.QueryRow(`
-		INSERT INTO urls (short_url, original_url)
-		VALUES ($1, $2)
-		ON CONFLICT (original_url) DO UPDATE SET original_url = EXCLUDED.original_url
-		RETURNING short_url
-	`, shortKey, originalURL).Scan(&existingShortURL)
+        WITH insert_attempt AS (
+            INSERT INTO urls (short_url, original_url)
+            VALUES ($1, $2)
+            ON CONFLICT (original_url) DO NOTHING
+            RETURNING short_url
+        )
+        SELECT * FROM insert_attempt
+        UNION
+        SELECT short_url FROM urls WHERE original_url = $2
+        LIMIT 1
+    `, shortKey, originalURL).Scan(&existingShortURL)
 
 	if err != nil {
-		return "", fmt.Errorf("failed to insert URL: %w", err)
+		return "", InternalSeverErrorCode, fmt.Errorf("database error: %w", err)
 	}
 
-	return existingShortURL, nil
+	if existingShortURL == record.ShortURL {
+		status = http.StatusCreated
+	} else {
+		status = http.StatusConflict
+	}
+
+	return existingShortURL, status, nil
 }
 
 func Read(db *sql.DB, shortID string) (string, bool) {

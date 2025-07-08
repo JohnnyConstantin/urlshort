@@ -20,7 +20,7 @@ type MemoryShortener struct {
 	cfg config.StorageConfig
 }
 
-func (s *DBShortener) ShortenURL(originalURL string) models.ShortenResponse {
+func (s *DBShortener) ShortenURL(originalURL string) (models.ShortenResponse, int) {
 	var ShortenURL models.ShortenResponse
 
 	fmt.Println("Shortening URL for DB: ", originalURL)
@@ -37,18 +37,18 @@ func (s *DBShortener) ShortenURL(originalURL string) models.ShortenResponse {
 	db, err := GetDBConnection(config.Options.DSN)
 
 	if err != nil {
-		return models.ShortenResponse{}
+		return models.ShortenResponse{}, store.InternalSeverErrorCode
 	}
 	defer db.Close()
 
-	shortID, err = store.Insert(db, record)
+	shortID, status, err := store.Insert(db, record)
 	if err != nil {
-		return models.ShortenResponse{}
+		return models.ShortenResponse{}, store.InternalSeverErrorCode
 	}
 
 	ShortenURL.Result = config.Options.BaseAddress + "/" + shortID
 
-	return ShortenURL
+	return ShortenURL, status
 }
 
 func (s *FileShortener) ShortenURL(originalURL string) models.ShortenResponse {

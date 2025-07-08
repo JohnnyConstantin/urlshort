@@ -75,6 +75,7 @@ func (h *Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) PostHandler(w http.ResponseWriter, r *http.Request) {
 	var ShortURL models.ShortenResponse
 	var OriginalURL models.ShortenRequest
+	var status int
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -105,22 +106,24 @@ func (h *Handler) PostHandler(w http.ResponseWriter, r *http.Request) {
 	switch cfg.StorageType {
 	case config.StorageFile:
 		shortener := FileShortener{cfg}
+		status = http.StatusCreated
 		ShortURL = shortener.ShortenURL(OriginalURL.URL)
 	case config.StorageMemory:
 		shortener := MemoryShortener{cfg}
+		status = http.StatusCreated
 		ShortURL = shortener.ShortenURL(OriginalURL.URL)
 	case config.StorageDB:
 		shortener := DBShortener{cfg}
-		ShortURL = shortener.ShortenURL(OriginalURL.URL)
+		ShortURL, status = shortener.ShortenURL(OriginalURL.URL)
 	default: // Overkill, но перестраховаться нужно
 		http.Error(w, store.DefaultError, store.DefaultErrorCode)
 	}
 
 	if r.Header.Get("Content-Type") == "application/json" {
-		w.WriteHeader(http.StatusCreated)
+		w.WriteHeader(status)
 		json.NewEncoder(w).Encode(ShortURL)
 	} else {
-		w.WriteHeader(http.StatusCreated)
+		w.WriteHeader(status)
 		w.Write([]byte(ShortURL.Result))
 	}
 }
@@ -128,6 +131,8 @@ func (h *Handler) PostHandler(w http.ResponseWriter, r *http.Request) {
 // PostHandlerMultiple обрабатывает POST запросы с batch
 func (h *Handler) PostHandlerMultiple(w http.ResponseWriter, r *http.Request) {
 	var requests []models.BatchShortenRequest
+	var ShortURL models.ShortenResponse
+	var status int
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -155,7 +160,8 @@ func (h *Handler) PostHandlerMultiple(w http.ResponseWriter, r *http.Request) {
 	case config.StorageFile:
 		shortener := FileShortener{cfg}
 		for _, req := range requests {
-			ShortURL := shortener.ShortenURL(req.OriginalURL)
+			ShortURL = shortener.ShortenURL(req.OriginalURL)
+			status = http.StatusCreated
 
 			responses = append(responses, models.BatchShortenResponse{
 				CorrelationID: req.CorrelationID,
@@ -166,7 +172,8 @@ func (h *Handler) PostHandlerMultiple(w http.ResponseWriter, r *http.Request) {
 	case config.StorageMemory:
 		shortener := MemoryShortener{cfg}
 		for _, req := range requests {
-			ShortURL := shortener.ShortenURL(req.OriginalURL)
+			ShortURL = shortener.ShortenURL(req.OriginalURL)
+			status = http.StatusCreated
 
 			responses = append(responses, models.BatchShortenResponse{
 				CorrelationID: req.CorrelationID,
@@ -176,7 +183,7 @@ func (h *Handler) PostHandlerMultiple(w http.ResponseWriter, r *http.Request) {
 	case config.StorageDB:
 		shortener := DBShortener{cfg}
 		for _, req := range requests {
-			ShortURL := shortener.ShortenURL(req.OriginalURL)
+			ShortURL, status = shortener.ShortenURL(req.OriginalURL)
 
 			responses = append(responses, models.BatchShortenResponse{
 				CorrelationID: req.CorrelationID,
@@ -188,7 +195,7 @@ func (h *Handler) PostHandlerMultiple(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
+	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(responses); err != nil {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 	}
