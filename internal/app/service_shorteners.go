@@ -11,17 +11,17 @@ import (
 
 type DBShortener struct {
 	cfg config.StorageConfig
-	mu  sync.RWMutex
+	mu  *sync.RWMutex
 }
 
 type FileShortener struct {
 	cfg config.StorageConfig
-	mu  sync.RWMutex
+	mu  *sync.RWMutex
 }
 
 type MemoryShortener struct {
 	cfg config.StorageConfig
-	mu  sync.RWMutex
+	mu  *sync.RWMutex
 }
 
 func (s *DBShortener) ShortenURL(originalURL string) (models.ShortenResponse, int) {

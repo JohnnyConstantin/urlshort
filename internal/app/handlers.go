@@ -46,7 +46,7 @@ func (h *Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
 	id := parts[0]
 
 	cfg := config.GetStorageConfig()
-	mu := *new(sync.RWMutex)
+	mu := new(sync.RWMutex)
 
 	switch cfg.StorageType {
 	case config.StorageFile:
@@ -104,7 +104,7 @@ func (h *Handler) PostHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cfg := config.GetStorageConfig()
-	mu := *new(sync.RWMutex)
+	mu := new(sync.RWMutex)
 	switch cfg.StorageType {
 	case config.StorageFile:
 		shortener := FileShortener{cfg, mu}
@@ -158,7 +158,7 @@ func (h *Handler) PostHandlerMultiple(w http.ResponseWriter, r *http.Request) {
 
 	responses := make([]models.BatchShortenResponse, 0, len(requests))
 	cfg := config.GetStorageConfig()
-	mu := *new(sync.RWMutex)
+	mu := new(sync.RWMutex)
 
 	switch cfg.StorageType {
 	case config.StorageFile:

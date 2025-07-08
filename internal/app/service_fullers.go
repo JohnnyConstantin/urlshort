@@ -10,17 +10,17 @@ import (
 
 type DBFuller struct {
 	cfg config.StorageConfig
-	mu  sync.RWMutex
+	mu  *sync.RWMutex
 }
 
 type FileFuller struct {
 	cfg config.StorageConfig
-	mu  sync.RWMutex
+	mu  *sync.RWMutex
 }
 
 type MemoryFuller struct {
 	cfg config.StorageConfig
-	mu  sync.RWMutex
+	mu  *sync.RWMutex
 }
 
 func (f *DBFuller) GetFullURL(shortID string) (models.ShortenRequest, bool) {
