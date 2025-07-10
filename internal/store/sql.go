@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/JohnnyConstantin/urlshort/models"
+	"github.com/jackc/pgx/v5/pgconn"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"net/http"
 )
@@ -70,7 +71,12 @@ func Insert(db *sql.DB, record models.URLRecord) (string, int, error) {
     `, shortKey, originalURL).Scan(&existingShortURL)
 
 	if err != nil {
-		return "", InternalSeverErrorCode, fmt.Errorf("database error: %w", err)
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" { // Товарищи в пачке уже сталкивались, у UniqueViolation именно такой код
+			// Просто возвращаем ошибку. Можно было бы перегенерировать shortURL, либо сделать роллбек через транзакции, но в ТЗ этого не указано, поэтому просто InternalError
+			return "", InternalSeverErrorCode, fmt.Errorf("insert failed: %v", err)
+		}
+		return "", InternalSeverErrorCode, fmt.Errorf("database error: %v", err)
 	}
 
 	if existingShortURL == record.ShortURL {
