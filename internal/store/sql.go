@@ -89,7 +89,7 @@ func Insert(db *sql.DB, record models.URLRecord) (string, int, error) {
 }
 
 // Read Вычитывает original_url по shortID
-func Read(db *sql.DB, shortID string) (string, bool) {
+func Read(db *sql.DB, shortID string) (string, bool, error) {
 	var originalURL string
 
 	err := db.QueryRow(
@@ -99,10 +99,10 @@ func Read(db *sql.DB, shortID string) (string, bool) {
 
 	switch {
 	case err == nil:
-		return originalURL, true
+		return originalURL, true, nil
 	case errors.Is(err, sql.ErrNoRows):
-		return "", false
+		return "", false, err
 	default:
-		return "", false
+		return "", false, err
 	}
 }

@@ -36,7 +36,10 @@ func (f *DBFuller) GetFullURL(shortID string) (models.ShortenRequest, bool) {
 	result := models.ShortenRequest{URL: ""}
 	fmt.Println("Fulling URL with DB: ", shortID)
 
-	originalURL, exists := store.Read(f.db, shortID)
+	originalURL, exists, err := store.Read(f.db, shortID)
+	if err != nil {
+		return result, false
+	}
 	if exists {
 		result.URL = originalURL
 		return result, exists
