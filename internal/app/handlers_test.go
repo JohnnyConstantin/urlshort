@@ -17,6 +17,7 @@ func TestPostHandler(t *testing.T) {
 	server := s.NewServer()
 	handler := server.Handler
 
+	config.CreateStorageConfig()
 	requestBody := "https://example.com"
 	req, err := http.NewRequest(http.MethodPost, "/", bytes.NewBufferString(requestBody))
 	if err != nil {
@@ -40,6 +41,7 @@ func TestPostHandler(t *testing.T) {
 
 // TestGetHandler проверяет хендлер GET запросов
 func TestGetHandler(t *testing.T) {
+	config.CreateStorageConfig()
 	testURL := "https://example.com"
 	var s Server
 	server := s.NewServer()
