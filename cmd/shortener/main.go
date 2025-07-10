@@ -87,7 +87,8 @@ func createHandlers(db *sql.DB, router *route.Mux, sugar zap.SugaredLogger, hand
 				app.WithLogging(db, // Логирование, прокидываем в него регистратор логов sugar
 					handler.GetHandler, sugar))) // Сам хендлер
 		r.Get("/ping",
-			handler.PingDBHandler) // Сам хендлер
+			app.WithLogging(db,
+				handler.PingDBHandler, sugar)) // Сам хендлер
 	})
 }
 

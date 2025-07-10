@@ -266,12 +266,10 @@ func (h *Handler) PingDBHandler(w http.ResponseWriter, r *http.Request) {
 		db, ok := r.Context().Value(dbKey).(*sql.DB)
 		if !ok {
 			http.Error(w, store.ConnectionError, http.StatusInternalServerError)
-			return
 		}
 		err := db.Ping()
 		if err != nil {
 			http.Error(w, store.ConnectionError, store.InternalSeverErrorCode)
-			return
 		}
 	}
 
