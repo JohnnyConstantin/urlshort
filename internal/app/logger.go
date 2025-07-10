@@ -8,7 +8,9 @@ import (
 	"time"
 )
 
-const dbKey string = "database"
+type key string
+
+const dbKey key = "database"
 
 type (
 	// Берём структуру для хранения сведений об ответе
