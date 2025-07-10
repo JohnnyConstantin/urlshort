@@ -2,15 +2,14 @@ package app
 
 import (
 	"compress/gzip"
+	"database/sql"
 	"encoding/json"
 	"github.com/JohnnyConstantin/urlshort/internal/config"
 	"github.com/JohnnyConstantin/urlshort/internal/store"
 	"github.com/JohnnyConstantin/urlshort/models"
-	_ "github.com/jackc/pgx/v5/stdlib"
 	"io"
 	"net/http"
 	"strings"
-	"sync"
 )
 
 type Handler struct {
@@ -39,31 +38,39 @@ func (h *Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
 	parts := strings.Split(path, "/")
 
 	if len(parts) != 1 {
-		http.Error(w, store.DefaultError, store.DefaultErrorCode)
+		http.Error(w, store.BadRequestError, store.DefaultErrorCode)
 		return
 	}
 
 	id := parts[0]
 
 	cfg := config.GetStorageConfig()
-	mu := new(sync.RWMutex)
 
 	switch cfg.StorageType {
 	case config.StorageFile:
-		fuller := FileFuller{cfg, mu}
+		fuller := FileFuller{cfg: cfg}
+		fuller.InitMutex()
 		response, exists = fuller.GetFullURL(id)
 	case config.StorageMemory:
-		fuller := MemoryFuller{cfg, mu}
+		fuller := MemoryFuller{cfg: cfg}
+		fuller.InitMutex()
 		response, exists = fuller.GetFullURL(id)
 	case config.StorageDB:
-		fuller := DBFuller{cfg, mu}
+		// Если StorageDB, то в context не может быть nil (на это есть проверка в main), однако, на всякий случай здесь повторяем
+		db, ok := r.Context().Value(dbKey).(*sql.DB)
+		if !ok {
+			http.Error(w, "DB not in context", http.StatusInternalServerError)
+		}
+		fuller := DBFuller{cfg, db}
 		response, exists = fuller.GetFullURL(id)
-	default: // Overkill, но перестраховаться нужно
+	default:
 		http.Error(w, store.DefaultError, store.DefaultErrorCode)
+		return
 	}
 
 	if !exists {
 		http.Error(w, store.DefaultError, store.DefaultErrorCode)
+		return
 	}
 
 	result := response.URL
@@ -104,21 +111,27 @@ func (h *Handler) PostHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cfg := config.GetStorageConfig()
-	mu := new(sync.RWMutex)
 	switch cfg.StorageType {
 	case config.StorageFile:
-		shortener := FileShortener{cfg, mu}
+		shortener := FileShortener{cfg: cfg}
+		shortener.InitMutex()
 		status = http.StatusCreated
 		ShortURL = shortener.ShortenURL(OriginalURL.URL)
 	case config.StorageMemory:
-		shortener := MemoryShortener{cfg, mu}
+		shortener := MemoryShortener{cfg: cfg}
+		shortener.InitMutex()
 		status = http.StatusCreated
 		ShortURL = shortener.ShortenURL(OriginalURL.URL)
 	case config.StorageDB:
-		shortener := DBShortener{cfg, mu}
+		db, ok := r.Context().Value(dbKey).(*sql.DB)
+		if !ok {
+			http.Error(w, "DB not in context", http.StatusInternalServerError)
+		}
+		shortener := DBShortener{cfg, db}
 		ShortURL, status = shortener.ShortenURL(OriginalURL.URL)
-	default: // Overkill, но перестраховаться нужно
+	default:
 		http.Error(w, store.DefaultError, store.DefaultErrorCode)
+		return
 	}
 
 	// Перенесенный функционал из JsonMiddleware. Необходимо для применения статус кода и json encoding для app/json Header
@@ -158,11 +171,11 @@ func (h *Handler) PostHandlerMultiple(w http.ResponseWriter, r *http.Request) {
 
 	responses := make([]models.BatchShortenResponse, 0, len(requests))
 	cfg := config.GetStorageConfig()
-	mu := new(sync.RWMutex)
 
 	switch cfg.StorageType {
 	case config.StorageFile:
-		shortener := FileShortener{cfg, mu}
+		shortener := FileShortener{cfg: cfg}
+		shortener.InitMutex()
 		for _, req := range requests {
 			ShortURL = shortener.ShortenURL(req.OriginalURL)
 			status = http.StatusCreated
@@ -174,7 +187,8 @@ func (h *Handler) PostHandlerMultiple(w http.ResponseWriter, r *http.Request) {
 		}
 
 	case config.StorageMemory:
-		shortener := MemoryShortener{cfg, mu}
+		shortener := MemoryShortener{cfg: cfg}
+		shortener.InitMutex()
 		for _, req := range requests {
 			ShortURL = shortener.ShortenURL(req.OriginalURL)
 			status = http.StatusCreated
@@ -185,7 +199,11 @@ func (h *Handler) PostHandlerMultiple(w http.ResponseWriter, r *http.Request) {
 			})
 		}
 	case config.StorageDB:
-		shortener := DBShortener{cfg, mu}
+		db, ok := r.Context().Value(dbKey).(*sql.DB)
+		if !ok {
+			http.Error(w, "DB not in context", http.StatusInternalServerError)
+		}
+		shortener := DBShortener{cfg, db}
 		for _, req := range requests {
 			ShortURL, status = shortener.ShortenURL(req.OriginalURL)
 
@@ -243,17 +261,18 @@ func GzipHandle(next http.HandlerFunc) http.HandlerFunc {
 
 // PingDBHandler Проверяет подключение к БД
 func (h *Handler) PingDBHandler(w http.ResponseWriter, r *http.Request) {
-	dsn := config.Options.DSN
-	dbConn, err := GetDBConnection(dsn)
-	if err != nil {
-		http.Error(w, store.ConnectionError, store.InternalSeverErrorCode)
-	}
-
-	defer dbConn.Close()
-
-	err = dbConn.Ping()
-	if err != nil {
-		http.Error(w, store.ConnectionError, store.InternalSeverErrorCode)
+	cfg := config.GetStorageConfig()
+	if cfg.StorageType == config.StorageDB {
+		db, ok := r.Context().Value(dbKey).(*sql.DB)
+		if !ok {
+			http.Error(w, store.ConnectionError, http.StatusInternalServerError)
+			return
+		}
+		err := db.Ping()
+		if err != nil {
+			http.Error(w, store.ConnectionError, store.InternalSeverErrorCode)
+			return
+		}
 	}
 
 	w.WriteHeader(http.StatusOK)

@@ -6,11 +6,30 @@ import (
 	"errors"
 	"fmt"
 	"github.com/JohnnyConstantin/urlshort/models"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"net/http"
 )
 
+type DB struct {
+	DB *sql.DB
+}
+
+func (d *DB) OpenDB(connStr string) error {
+	sqlDB, err := sql.Open("pgx", connStr)
+	if err != nil {
+		return fmt.Errorf("не удалось подключиться к БД: %v", err)
+	}
+
+	if err = sqlDB.Ping(); err != nil {
+		return fmt.Errorf("не удалось проверить подключение: %v", err)
+	}
+
+	d.DB = sqlDB
+	return nil
+}
+
 // InitDB создает базу данных, если ее нет
-func InitDB(db *sql.DB) error {
+func (d *DB) InitDB() error {
 	query := `
 	CREATE TABLE IF NOT EXISTS urls (
 		id          SERIAL PRIMARY KEY,
@@ -21,10 +40,11 @@ func InitDB(db *sql.DB) error {
 	CREATE INDEX IF NOT EXISTS idx_short_url ON urls(short_url);
 	CREATE INDEX IF NOT EXISTS idx_original_url ON urls(original_url);
 	`
-	_, err := db.ExecContext(context.Background(), query)
+	_, err := d.DB.ExecContext(context.Background(), query)
 	if err != nil {
 		return fmt.Errorf("failed to create table: %w", err)
 	}
+
 	return nil
 }
 

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"database/sql"
 	"fmt"
 	"github.com/JohnnyConstantin/urlshort/internal/config"
 	"github.com/JohnnyConstantin/urlshort/internal/store"
@@ -11,21 +12,29 @@ import (
 
 type DBShortener struct {
 	cfg config.StorageConfig
-	mu  *sync.RWMutex
+	db  *sql.DB
 }
 
 type FileShortener struct {
 	cfg config.StorageConfig
-	mu  *sync.RWMutex
+	mu  *sync.Mutex
+}
+
+func (s *FileShortener) InitMutex() {
+	s.mu = new(sync.Mutex)
 }
 
 type MemoryShortener struct {
 	cfg config.StorageConfig
-	mu  *sync.RWMutex
+	mu  *sync.Mutex
+}
+
+func (s *MemoryShortener) InitMutex() {
+	s.mu = new(sync.Mutex)
 }
 
 func (s *DBShortener) ShortenURL(originalURL string) (models.ShortenResponse, int) {
-	var ShortenURL models.ShortenResponse
+	var shortenURL models.ShortenResponse
 
 	fmt.Println("Shortening URL for DB: ", originalURL)
 
@@ -38,25 +47,18 @@ func (s *DBShortener) ShortenURL(originalURL string) (models.ShortenResponse, in
 		OriginalURL: originalURL,
 	}
 
-	db, err := GetDBConnection(config.Options.DSN)
-
-	if err != nil {
-		return models.ShortenResponse{}, store.InternalSeverErrorCode
-	}
-	defer db.Close()
-
-	shortID, status, err := store.Insert(db, record)
+	shortID, status, err := store.Insert(s.db, record)
 	if err != nil {
 		return models.ShortenResponse{}, store.InternalSeverErrorCode
 	}
 
-	ShortenURL.Result = config.Options.BaseAddress + "/" + shortID
+	shortenURL.Result = config.Options.BaseAddress + "/" + shortID
 
-	return ShortenURL, status
+	return shortenURL, status
 }
 
 func (s *FileShortener) ShortenURL(originalURL string) models.ShortenResponse {
-	var ShortenURL models.ShortenResponse
+	var shortenURL models.ShortenResponse
 
 	shortID := uuid.New().String()[:8]
 
@@ -69,19 +71,19 @@ func (s *FileShortener) ShortenURL(originalURL string) models.ShortenResponse {
 
 	s.mu.Lock()
 	store.URLStore[shortID] = originalURL // сохраняем в память
-	err := SaveToFile(record)             // сохраняем в файл
+	s.mu.Unlock()
+	err := SaveToFile(record) // сохраняем в файл
 	if err != nil {
 		return models.ShortenResponse{}
 	}
-	s.mu.Unlock()
 
-	ShortenURL.Result = config.Options.BaseAddress + "/" + shortID
+	shortenURL.Result = config.Options.BaseAddress + "/" + shortID
 
-	return ShortenURL
+	return shortenURL
 }
 
 func (s *MemoryShortener) ShortenURL(originalURL string) models.ShortenResponse {
-	var ShortenURL models.ShortenResponse
+	var shortenURL models.ShortenResponse
 
 	shortID := uuid.New().String()[:8]
 
@@ -89,7 +91,7 @@ func (s *MemoryShortener) ShortenURL(originalURL string) models.ShortenResponse 
 	store.URLStore[shortID] = originalURL // сохраняем в память
 	s.mu.Unlock()
 
-	ShortenURL.Result = config.Options.BaseAddress + "/" + shortID
+	shortenURL.Result = config.Options.BaseAddress + "/" + shortID
 
-	return ShortenURL
+	return shortenURL
 }

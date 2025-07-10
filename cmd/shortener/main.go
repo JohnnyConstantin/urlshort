@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"flag"
 	"github.com/JohnnyConstantin/urlshort/internal/app"
 	"github.com/JohnnyConstantin/urlshort/internal/config"
@@ -30,9 +31,6 @@ func main() {
 
 	sugar = *logger.Sugar() // Создали экземпляр и в дальнейшем прокидываем его в middleware с логированием
 
-	// Вынес создание роутов в отдельную функцию
-	createHandlers(router, sugar, handler)
-
 	flag.Parse()
 
 	// Вынес загрузку переменных окружения в отдельную функцию
@@ -44,8 +42,19 @@ func main() {
 		"addr", config.Options.Address,
 	)
 
-	// Создание и применение конфигурации
-	storageDecider()
+	// Создание и применение конфигурации. Если ошибка - выход с ненулевым кодом. Ошибка при этом логируется в sugar
+	db, err := storageDecider()
+	if err != nil {
+		os.Exit(1)
+	}
+
+	//Если вернулся хендлер к БД (т.е. успешно создано соединение к БД), то закрываем после завершения программы
+	if db != nil {
+		defer db.Close()
+	}
+
+	// Вынес создание роутов в отдельную функцию
+	createHandlers(db, router, sugar, handler)
 
 	err = http.ListenAndServe(config.Options.Address, router)
 	if err != nil {
@@ -53,29 +62,29 @@ func main() {
 	}
 }
 
-func createHandlers(router *route.Mux, sugar zap.SugaredLogger, handler *app.Handler) {
+func createHandlers(db *sql.DB, router *route.Mux, sugar zap.SugaredLogger, handler *app.Handler) {
 	//Накидываем хендлеры на роуты
 	router.Route("/", func(r route.Router) {
 		r.Post("/",
 			app.GzipHandle( // Сжатие
-				app.WithLogging( // Логирование, прокидываем в него регистратор логов sugar
+				app.WithLogging(db, // Логирование, прокидываем в него регистратор логов sugar
 					handler.PostHandler, sugar))) // Сам хендлер
 		r.Route("/api", func(r route.Router) {
 			r.Route("/shorten", func(r route.Router) {
 				r.Post("/",
 					app.GzipHandle( // Сжатие
-						app.WithLogging( // Логирование, прокидываем в него регистратор логов sugar
+						app.WithLogging(db, // Логирование, прокидываем в него регистратор логов sugar
 							handler.PostHandler, sugar))) // Сам хендлер
 				r.Post("/batch",
 					app.GzipHandle( // Сжатие
-						app.WithLogging( // Логирование, прокидываем в него регистратор логов sugar
+						app.WithLogging(db, // Логирование, прокидываем в него регистратор логов sugar
 							handler.PostHandlerMultiple, sugar))) // Сам хендлер
 
 			})
 		})
 		r.Get("/{id}",
 			app.GzipHandle( // Сжатие
-				app.WithLogging( // Логирование, прокидываем в него регистратор логов sugar
+				app.WithLogging(db, // Логирование, прокидываем в него регистратор логов sugar
 					handler.GetHandler, sugar))) // Сам хендлер
 		r.Get("/ping",
 			handler.PingDBHandler) // Сам хендлер
@@ -84,22 +93,26 @@ func createHandlers(router *route.Mux, sugar zap.SugaredLogger, handler *app.Han
 
 func loadEnvs() {
 	//Подгружаем переменные окружения при наличии
-	if envA := os.Getenv("SERVER_ADDRESS"); envA != "" {
+	envA, ok := os.LookupEnv("SERVER_ADDRESS")
+	if ok && envA != "" {
 		config.Options.Address = envA
 	}
-	if envB := os.Getenv("BASE_URL"); envB != "" {
+	envB, ok := os.LookupEnv("BASE_URL")
+	if ok && envB != "" {
 		config.Options.BaseAddress = envB
 	}
-	if envC := os.Getenv("FILE_STORAGE_PATH"); envC != "" {
+	envC, ok := os.LookupEnv("FILE_STORAGE_PATH")
+	if ok && envC != "" {
 		config.Options.FileToWrite = envC
 	}
 
-	if envD := os.Getenv("DATABASE_DSN"); envD != "" {
+	envD, ok := os.LookupEnv("DATABASE_DSN")
+	if ok && envD != "" {
 		config.Options.DSN = envD
 	}
 }
 
-func storageDecider() {
+func storageDecider() (*sql.DB, error) {
 	// Вызываем резолвер способа хранения данных
 	config.CreateStorageConfig()
 	cfg := config.GetStorageConfig()
@@ -107,22 +120,23 @@ func storageDecider() {
 	//Логируем какой StorageType будет использован, для FileMemory выполняем операцию по восстановлению из файла
 	switch cfg.StorageType {
 	case config.StorageDB:
-		// Проверяем насколько верный DSN
-		db, err := app.GetDBConnection(config.Options.DSN)
+		db := store.DB{}
+		err := db.OpenDB(config.Options.DSN)
 		if err != nil {
 			sugar.Error("Could not connect to database")
-			return
+			return nil, err
 		}
-		defer db.Close()
 
 		// Создаем таблицу (если ее нет)
-		if err := store.InitDB(db); err != nil {
+		if err = db.InitDB(); err != nil {
 			sugar.Error("Could not initialize database")
-			return
+			return nil, err
 		}
 
 		sugar.Infow("Using PostgreSQL as a storage",
 			"DSN", config.Options.DSN)
+
+		return db.DB, nil
 
 	case config.StorageFile:
 		sugar.Infow("Using file as a storage",
@@ -133,10 +147,11 @@ func storageDecider() {
 		// Вариант с "постоянно дергать файл на Read/Write операции" без использования in-Memory показался совсем варварским
 		err := app.LoadURLsFromFile(config.Options.FileToWrite, sugar)
 		if err != nil {
-			return
+			return nil, err
 		}
 	default:
 		//Только логируем, никаких доп.действий не требуется, все реализовано через проверку StorageType в целевых функциях
 		sugar.Infow("Using memory storage (no persistence)")
 	}
+	return nil, nil
 }

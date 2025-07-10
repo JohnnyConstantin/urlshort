@@ -8,4 +8,5 @@ const (
 	ReadBodyError          = "Failed to read request body"
 	LargeBodyError         = "Request body too large"
 	ConnectionError        = "Connection error"
+	BadRequestError        = "Bad request"
 )

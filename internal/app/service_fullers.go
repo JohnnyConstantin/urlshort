@@ -1,6 +1,7 @@
 package app
 
 import (
+	"database/sql"
 	"fmt"
 	"github.com/JohnnyConstantin/urlshort/internal/config"
 	"github.com/JohnnyConstantin/urlshort/internal/store"
@@ -10,60 +11,62 @@ import (
 
 type DBFuller struct {
 	cfg config.StorageConfig
-	mu  *sync.RWMutex
+	db  *sql.DB
 }
 
 type FileFuller struct {
 	cfg config.StorageConfig
-	mu  *sync.RWMutex
+	mu  *sync.Mutex
+}
+
+func (f *FileFuller) InitMutex() {
+	f.mu = new(sync.Mutex)
 }
 
 type MemoryFuller struct {
 	cfg config.StorageConfig
-	mu  *sync.RWMutex
+	mu  *sync.Mutex
+}
+
+func (f *MemoryFuller) InitMutex() {
+	f.mu = new(sync.Mutex)
 }
 
 func (f *DBFuller) GetFullURL(shortID string) (models.ShortenRequest, bool) {
-	Result := models.ShortenRequest{URL: ""}
+	result := models.ShortenRequest{URL: ""}
 	fmt.Println("Fulling URL with DB: ", shortID)
 
-	db, err := GetDBConnection(config.Options.DSN)
-	if err != nil {
-		return Result, false
-	}
-	defer db.Close()
-
-	originalURL, exists := store.Read(db, shortID)
+	originalURL, exists := store.Read(f.db, shortID)
 	if exists {
-		Result.URL = originalURL
-		return Result, exists
+		result.URL = originalURL
+		return result, exists
 	}
 
-	return Result, false
+	return result, false
 }
 
 func (f *FileFuller) GetFullURL(shortID string) (models.ShortenRequest, bool) {
-	Result := models.ShortenRequest{URL: ""}
+	result := models.ShortenRequest{URL: ""}
 
-	f.mu.RLock()
-	defer f.mu.RUnlock()
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	originalURL, exists := store.URLStore[shortID]
 	if exists {
-		Result.URL = originalURL
-		return Result, exists
+		result.URL = originalURL
+		return result, exists
 	}
-	return Result, exists
+	return result, exists
 }
 
 func (f *MemoryFuller) GetFullURL(shortID string) (models.ShortenRequest, bool) {
-	Result := models.ShortenRequest{URL: ""}
+	result := models.ShortenRequest{URL: ""}
 
-	f.mu.RLock()
-	defer f.mu.RUnlock()
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	originalURL, exists := store.URLStore[shortID]
 	if exists {
-		Result.URL = originalURL
-		return Result, exists
+		result.URL = originalURL
+		return result, exists
 	}
-	return Result, exists
+	return result, exists
 }

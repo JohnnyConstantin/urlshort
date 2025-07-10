@@ -1,10 +1,14 @@
 package app
 
 import (
+	"context"
+	"database/sql"
 	"go.uber.org/zap"
 	"net/http"
 	"time"
 )
+
+const dbKey string = "database"
 
 type (
 	// Берём структуру для хранения сведений об ответе
@@ -33,9 +37,11 @@ func (r *loggingResponseWriter) WriteHeader(statusCode int) {
 	r.responseData.status = statusCode // захватываем код статуса
 }
 
-func WithLogging(h http.HandlerFunc, logger zap.SugaredLogger) http.HandlerFunc {
+func WithLogging(db *sql.DB, h http.HandlerFunc, logger zap.SugaredLogger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now() // Засекаем
+
+		ctx := context.WithValue(r.Context(), dbKey, db)
 
 		responseData := &responseData{
 			status: 0,
@@ -46,7 +52,7 @@ func WithLogging(h http.HandlerFunc, logger zap.SugaredLogger) http.HandlerFunc 
 			responseData:   responseData,
 		}
 		// Прокидываем дальше
-		h(&lw, r)
+		h(&lw, r.WithContext(ctx))
 
 		duration := time.Since(start) // Получаем время выполнения всех последующих middleware хендлеров
 		//todo Кажется, лучше вынести засекание времени выполнения в отдельный middleware с хранением времени старта.
