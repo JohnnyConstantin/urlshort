@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 )
 
 type Handler struct {
@@ -34,6 +35,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
 	response := models.ShortenRequest{URL: ""}
 	exists := false //By default не существует
+	var isDeleted bool
+	var status int
 	path := strings.Trim(r.URL.Path, "/")
 	parts := strings.Split(path, "/")
 
@@ -61,13 +64,14 @@ func (h *Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
 		if !ok {
 			http.Error(w, "DB not in context", http.StatusInternalServerError)
 		}
-		userID, ok := r.Context().Value(user).(string)
-		if !ok {
-			http.Error(w, "userID not in context", http.StatusInternalServerError)
-			return
-		}
+
 		fuller := DBFuller{cfg, db}
-		response, exists = fuller.GetFullURL(id, userID)
+		response, exists, isDeleted = fuller.GetFullURL(id)
+		if isDeleted {
+			status = 410
+		} else {
+			status = 307
+		}
 	default:
 		http.Error(w, store.DefaultError, store.DefaultErrorCode)
 		return
@@ -82,7 +86,7 @@ func (h *Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Location", result)
 
-	w.WriteHeader(307)
+	w.WriteHeader(status)
 }
 
 // PostHandler обрабатывает POST запросы
@@ -255,11 +259,26 @@ func (h *Handler) DeleteHandlerMultiple(w http.ResponseWriter, r *http.Request) 
 
 	deleter := DBDeleter{cfg: config.GetStorageConfig(), db: db}
 
-	err := deleter.DeleteURL(userID)
-	if err != nil {
-		http.Error(w, store.DefaultError, store.InternalSeverErrorCode)
+	// Парсим тело запроса
+	var shortURLs []string
+	if err := json.NewDecoder(r.Body).Decode(&shortURLs); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
+
+	// Запускаем асинхронное удаление
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		ctx := r.Context()
+		if err := deleter.DeleteURL(ctx, userID, shortURLs); err != nil {
+			// Логируем ошибку, но не возвращаем пользователю
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	}()
+
+	wg.Wait()
 
 	w.WriteHeader(http.StatusAccepted)
 }

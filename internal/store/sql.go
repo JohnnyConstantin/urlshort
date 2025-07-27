@@ -92,21 +92,22 @@ func Insert(db *sql.DB, record models.URLRecord, uuid string) (string, int, erro
 }
 
 // Read Вычитывает original_url по shortID
-func Read(db *sql.DB, shortID string) (string, bool, error) {
+func Read(db *sql.DB, shortID string) (string, bool, bool, error) {
 	var originalURL string
+	var isDeleted bool
 
 	err := db.QueryRow(
-		`SELECT original_url FROM urls WHERE short_url = $1 LIMIT 1`,
+		`SELECT original_url, is_deleted FROM urls WHERE short_url = $1`,
 		shortID,
-	).Scan(&originalURL)
+	).Scan(&originalURL, &isDeleted)
 
 	switch {
 	case err == nil:
-		return originalURL, true, nil
+		return originalURL, true, isDeleted, nil
 	case errors.Is(err, sql.ErrNoRows):
-		return "", false, err
+		return "", false, false, err
 	default:
-		return "", false, err
+		return "", false, false, err
 	}
 }
 
@@ -139,18 +140,25 @@ func ReadWithUUID(db *sql.DB, userID string) ([]models.URLResponse, error) {
 	return result, nil
 }
 
-func DeleteURLs(db *sql.DB, userID string) error {
-	res, err := db.Exec(
-		`UPDATE urls SET is_deleted = true WHERE user_id = $1 AND is_deleted = false`,
-		userID,
-	)
+func DeleteURLs(db *sql.DB, userID string, batch []string) error {
 
-	fmt.Println(res)
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback() // Rollback on error
 
+	for _, shortURL := range batch {
+		_, err := tx.Exec("UPDATE urls SET is_deleted = true WHERE short_url = $1", shortURL)
+		if err != nil {
+			return err
+		}
+	}
+
+	err = tx.Commit()
 	if err != nil {
 		return err
 	}
 
 	return nil
-
 }

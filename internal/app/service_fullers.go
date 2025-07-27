@@ -32,20 +32,20 @@ func (f *MemoryFuller) InitMutex() {
 	f.mu = new(sync.Mutex)
 }
 
-func (f *DBFuller) GetFullURL(shortID string, userID string) (models.ShortenRequest, bool) {
+func (f *DBFuller) GetFullURL(shortID string) (models.ShortenRequest, bool, bool) {
 	result := models.ShortenRequest{URL: ""}
 	fmt.Println("Fulling URL with DB: ", shortID)
 
-	originalURL, exists, err := store.Read(f.db, shortID)
+	originalURL, exists, isDeleted, err := store.Read(f.db, shortID)
 	if err != nil {
-		return result, false
+		return result, false, false
 	}
 	if exists {
 		result.URL = originalURL
-		return result, exists
+		return result, exists, isDeleted
 	}
 
-	return result, false
+	return result, false, false
 }
 
 func (f *FileFuller) GetFullURL(shortID string) (models.ShortenRequest, bool) {
