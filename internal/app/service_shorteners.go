@@ -2,7 +2,6 @@ package app
 
 import (
 	"database/sql"
-	"fmt"
 	"github.com/JohnnyConstantin/urlshort/internal/config"
 	"github.com/JohnnyConstantin/urlshort/internal/store"
 	"github.com/JohnnyConstantin/urlshort/models"
@@ -33,10 +32,8 @@ func (s *MemoryShortener) InitMutex() {
 	s.mu = new(sync.Mutex)
 }
 
-func (s *DBShortener) ShortenURL(originalURL string) (models.ShortenResponse, int) {
+func (s *DBShortener) ShortenURL(userID string, originalURL string) (models.ShortenResponse, int) {
 	var shortenURL models.ShortenResponse
-
-	fmt.Println("Shortening URL for DB: ", originalURL)
 
 	shortID := uuid.New().String()[:8]
 
@@ -47,9 +44,9 @@ func (s *DBShortener) ShortenURL(originalURL string) (models.ShortenResponse, in
 		OriginalURL: originalURL,
 	}
 
-	shortID, status, err := store.Insert(s.db, record)
+	shortID, status, err := store.Insert(s.db, record, userID)
 	if err != nil {
-		return models.ShortenResponse{}, store.InternalSeverErrorCode
+		return models.ShortenResponse{}, status
 	}
 
 	shortenURL.Result = config.Options.BaseAddress + "/" + shortID

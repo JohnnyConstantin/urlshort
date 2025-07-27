@@ -32,7 +32,7 @@ func (f *MemoryFuller) InitMutex() {
 	f.mu = new(sync.Mutex)
 }
 
-func (f *DBFuller) GetFullURL(shortID string) (models.ShortenRequest, bool) {
+func (f *DBFuller) GetFullURL(shortID string, userID string) (models.ShortenRequest, bool) {
 	result := models.ShortenRequest{URL: ""}
 	fmt.Println("Fulling URL with DB: ", shortID)
 

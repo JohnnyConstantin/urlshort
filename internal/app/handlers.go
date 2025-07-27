@@ -61,8 +61,13 @@ func (h *Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
 		if !ok {
 			http.Error(w, "DB not in context", http.StatusInternalServerError)
 		}
+		userID, ok := r.Context().Value(user).(string)
+		if !ok {
+			http.Error(w, "userID not in context", http.StatusInternalServerError)
+			return
+		}
 		fuller := DBFuller{cfg, db}
-		response, exists = fuller.GetFullURL(id)
+		response, exists = fuller.GetFullURL(id, userID)
 	default:
 		http.Error(w, store.DefaultError, store.DefaultErrorCode)
 		return
@@ -126,9 +131,16 @@ func (h *Handler) PostHandler(w http.ResponseWriter, r *http.Request) {
 		db, ok := r.Context().Value(dbKey).(*sql.DB)
 		if !ok {
 			http.Error(w, "DB not in context", http.StatusInternalServerError)
+			return
+		}
+		//userID := "123456789"
+		userID, ok := r.Context().Value(user).(string)
+		if !ok {
+			http.Error(w, "userID not found in context", http.StatusInternalServerError)
+			return
 		}
 		shortener := DBShortener{cfg, db}
-		ShortURL, status = shortener.ShortenURL(OriginalURL.URL)
+		ShortURL, status = shortener.ShortenURL(string(userID), OriginalURL.URL)
 	default:
 		http.Error(w, store.DefaultError, store.DefaultErrorCode)
 		return
@@ -202,10 +214,16 @@ func (h *Handler) PostHandlerMultiple(w http.ResponseWriter, r *http.Request) {
 		db, ok := r.Context().Value(dbKey).(*sql.DB)
 		if !ok {
 			http.Error(w, "DB not in context", http.StatusInternalServerError)
+			return
+		}
+		userID, ok := r.Context().Value(user).(string)
+		if !ok {
+			http.Error(w, "userID not found in context", http.StatusInternalServerError)
+			return
 		}
 		shortener := DBShortener{cfg, db}
 		for _, req := range requests {
-			ShortURL, status = shortener.ShortenURL(req.OriginalURL)
+			ShortURL, status = shortener.ShortenURL(userID, req.OriginalURL)
 
 			responses = append(responses, models.BatchShortenResponse{
 				CorrelationID: req.CorrelationID,
@@ -221,6 +239,61 @@ func (h *Handler) PostHandlerMultiple(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(responses); err != nil {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 	}
+}
+
+func (h *Handler) DeleteHandlerMultiple(w http.ResponseWriter, r *http.Request) {
+	db, ok := r.Context().Value(dbKey).(*sql.DB)
+	if !ok {
+		http.Error(w, "DB not in context", http.StatusInternalServerError)
+		return
+	}
+	userID, ok := r.Context().Value(user).(string)
+	if !ok {
+		http.Error(w, "userID not found in context", http.StatusInternalServerError)
+		return
+	}
+
+	deleter := DBDeleter{cfg: config.GetStorageConfig(), db: db}
+
+	err := deleter.DeleteURL(userID)
+	if err != nil {
+		http.Error(w, store.DefaultError, store.InternalSeverErrorCode)
+		return
+	}
+
+	w.WriteHeader(http.StatusAccepted)
+}
+
+func (h *Handler) GetHandlerMultiple(w http.ResponseWriter, r *http.Request) {
+	db, ok := r.Context().Value(dbKey).(*sql.DB)
+	if !ok {
+		http.Error(w, "DB not in context", http.StatusInternalServerError)
+		return
+	}
+	userID, ok := r.Context().Value(user).(string)
+	if !ok {
+		http.Error(w, "userID not found in context", http.StatusInternalServerError)
+		return
+	}
+
+	urls, err := store.ReadWithUUID(db, userID)
+	if err != nil {
+		http.Error(w, store.DefaultError, store.DefaultErrorCode)
+		return
+	}
+
+	if len(urls) == 0 {
+		http.Error(w, store.DefaultError, http.StatusNoContent)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(urls); err != nil {
+		http.Error(w, "JSON encoding failed", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(307)
 }
 
 func GzipHandle(next http.HandlerFunc) http.HandlerFunc {
