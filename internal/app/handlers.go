@@ -10,7 +10,6 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"sync"
 )
 
 type Handler struct {
@@ -266,19 +265,10 @@ func (h *Handler) DeleteHandlerMultiple(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Запускаем асинхронное удаление
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		ctx := r.Context()
-		if err := deleter.DeleteURL(ctx, userID, shortURLs); err != nil {
-			// Логируем ошибку, но не возвращаем пользователю
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-	}()
-
-	wg.Wait()
+	ctx := r.Context()
+	if err := deleter.DeleteURL(ctx, userID, shortURLs); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 
 	w.WriteHeader(http.StatusAccepted)
 }
