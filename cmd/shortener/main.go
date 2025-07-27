@@ -131,7 +131,7 @@ func loadEnvs() {
 
 	envE, ok := os.LookupEnv("SECRET_KEY")
 	if ok && envE != "" {
-		config.Options.SECRET_KEY = envE
+		config.Options.SecretKey = envE
 	}
 
 }

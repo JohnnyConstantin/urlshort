@@ -23,7 +23,7 @@ var Options struct {
 	BaseAddress string
 	DSN         string
 	FileToWrite string
-	SECRET_KEY  string
+	SecretKey   string
 }
 
 var Config StorageConfig
@@ -58,9 +58,9 @@ func init() {
 		"Database connection string",
 	)
 	flag.StringVar( // Ключ для подписи куки
-		&Options.SECRET_KEY,
+		&Options.SecretKey,
 		"k",
-		"",
+		"default_key",
 		"Secret key for user authentication",
 	)
 }

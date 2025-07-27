@@ -74,7 +74,7 @@ func authenticate(w *http.ResponseWriter) string {
 	userID := uuid.New().String()
 	newCookie, err := auth.CreateAuthCookie(userID)
 	if err != nil {
-		http.Error(*w, err.Error(), 501)
+		http.Error(*w, err.Error(), http.StatusInternalServerError)
 	}
 	http.SetCookie(*w, newCookie)
 	return userID

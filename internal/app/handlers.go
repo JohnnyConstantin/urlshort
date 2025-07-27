@@ -48,6 +48,8 @@ func (h *Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
 
 	cfg := config.GetStorageConfig()
 
+	status = 307 //default
+
 	switch cfg.StorageType {
 	case config.StorageFile:
 		fuller := FileFuller{cfg: cfg}
@@ -68,8 +70,6 @@ func (h *Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
 		response, exists, isDeleted = fuller.GetFullURL(id)
 		if isDeleted {
 			status = 410
-		} else {
-			status = 307
 		}
 	default:
 		http.Error(w, store.DefaultError, store.DefaultErrorCode)

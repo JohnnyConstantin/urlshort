@@ -11,7 +11,7 @@ import (
 )
 
 func CreateSignature(userID string, timestamp time.Time) string {
-	h := hmac.New(sha256.New, []byte(config.Options.SECRET_KEY))
+	h := hmac.New(sha256.New, []byte(config.Options.SecretKey))
 	data := fmt.Sprintf("%s|%d", userID, timestamp.Unix())
 	h.Write([]byte(data))
 	return base64.URLEncoding.EncodeToString(h.Sum(nil))
