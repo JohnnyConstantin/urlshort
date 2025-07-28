@@ -42,7 +42,6 @@ func (h *Handler) WithAuth(hf http.HandlerFunc) http.HandlerFunc {
 			timestampStr := parts[1]
 			signature := parts[2]
 
-			fmt.Println("USRID: " + userID)
 			if userID == "" {
 				http.Error(w, "No such user", http.StatusUnauthorized)
 				return
@@ -57,7 +56,6 @@ func (h *Handler) WithAuth(hf http.HandlerFunc) http.HandlerFunc {
 				userID = authenticate(w)
 			}
 
-			println("Using cookie:" + userID)
 			ctx := context.WithValue(r.Context(), user, userID)
 			// Прокидываем дальше
 			hf(w, r.WithContext(ctx))
@@ -65,7 +63,6 @@ func (h *Handler) WithAuth(hf http.HandlerFunc) http.HandlerFunc {
 		} else { // если куки нет, то авторизовать
 			newUserID := authenticate(w)
 			ctx := context.WithValue(r.Context(), user, newUserID)
-			fmt.Println("Using cookie:" + newUserID)
 			// Прокидываем дальше
 			hf(w, r.WithContext(ctx))
 		}
