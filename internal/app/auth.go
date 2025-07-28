@@ -53,7 +53,11 @@ func (h *Handler) WithAuth(hf http.HandlerFunc) http.HandlerFunc {
 
 			expectedSig := auth.CreateSignature(userID, timestamp)
 			if !hmac.Equal([]byte(signature), []byte(expectedSig)) {
-				userID = authenticate(w)
+				userID, err = authenticate(w)
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
 			}
 
 			ctx := context.WithValue(r.Context(), user, userID)
@@ -61,7 +65,11 @@ func (h *Handler) WithAuth(hf http.HandlerFunc) http.HandlerFunc {
 			hf(w, r.WithContext(ctx))
 
 		} else { // если куки нет, то авторизовать
-			newUserID := authenticate(w)
+			newUserID, err := authenticate(w)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 			ctx := context.WithValue(r.Context(), user, newUserID)
 			// Прокидываем дальше
 			hf(w, r.WithContext(ctx))
@@ -69,12 +77,12 @@ func (h *Handler) WithAuth(hf http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-func authenticate(w http.ResponseWriter) string {
+func authenticate(w http.ResponseWriter) (string, error) {
 	userID := uuid.New().String()
 	newCookie, err := auth.CreateAuthCookie(userID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return "", err
 	}
 	http.SetCookie(w, newCookie)
-	return userID
+	return userID, nil
 }
