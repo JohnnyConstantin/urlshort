@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"github.com/JohnnyConstantin/urlshort/internal/config"
 	"github.com/JohnnyConstantin/urlshort/models"
 	"github.com/jackc/pgx/v5/pgconn"
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -127,9 +128,11 @@ func ReadWithUUID(db *sql.DB, userID string) ([]models.URLResponse, error) {
 
 	for rows.Next() {
 		var record models.URLResponse
-		if err := rows.Scan(&record.ShortURL, &record.OriginalURL); err != nil {
+		var shortURL string
+		if err := rows.Scan(&shortURL, &record.OriginalURL); err != nil {
 			return nil, err
 		}
+		record.ShortURL = config.Options.BaseAddress + "/" + shortURL
 		result = append(result, record)
 	}
 
