@@ -146,10 +146,10 @@ func DeleteURLs(db *sql.DB, userID string, batch []string) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback() // Rollback on error
+	defer tx.Rollback()
 
 	for _, shortURL := range batch {
-		_, err := tx.Exec("UPDATE urls SET is_deleted = true WHERE short_url = $1", shortURL)
+		_, err := tx.Exec("UPDATE urls SET is_deleted = true WHERE short_url = $1 AND uuid = $2", shortURL, userID)
 		if err != nil {
 			return err
 		}

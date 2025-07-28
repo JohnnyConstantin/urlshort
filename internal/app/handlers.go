@@ -48,7 +48,7 @@ func (h *Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
 
 	cfg := config.GetStorageConfig()
 
-	status = 307 //default
+	status = http.StatusTemporaryRedirect //default
 
 	switch cfg.StorageType {
 	case config.StorageFile:
@@ -69,7 +69,7 @@ func (h *Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
 		fuller := DBFuller{cfg, db}
 		response, exists, isDeleted = fuller.GetFullURL(id)
 		if isDeleted {
-			status = 410
+			status = http.StatusGone
 		}
 	default:
 		http.Error(w, store.DefaultError, store.DefaultErrorCode)

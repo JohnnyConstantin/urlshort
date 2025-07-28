@@ -27,8 +27,10 @@ func CreateAuthCookie(userID string) (*http.Cookie, error) {
 	return &http.Cookie{
 		Name:     "auth_user",
 		Value:    encoded,
+		Path:     "/",
 		MaxAge:   30 * 24 * 60 * 60,
-		Secure:   true,
+		Secure:   false,
+		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 	}, nil
 }
