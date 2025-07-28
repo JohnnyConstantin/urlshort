@@ -2,7 +2,6 @@ package app
 
 import (
 	"database/sql"
-	"fmt"
 	"github.com/JohnnyConstantin/urlshort/internal/config"
 	"github.com/JohnnyConstantin/urlshort/internal/store"
 	"github.com/JohnnyConstantin/urlshort/models"
@@ -34,7 +33,6 @@ func (f *MemoryFuller) InitMutex() {
 
 func (f *DBFuller) GetFullURL(shortID string) (models.ShortenRequest, bool, bool) {
 	result := models.ShortenRequest{URL: ""}
-	fmt.Println("Fulling URL with DB: ", shortID)
 
 	originalURL, exists, isDeleted, err := store.Read(f.db, shortID)
 	if err != nil {

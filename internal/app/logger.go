@@ -68,7 +68,6 @@ func WithLogging(db *sql.DB, h http.HandlerFunc, logger zap.SugaredLogger) http.
 			"status", responseData.status,
 			"duration", duration,
 			"size", responseData.size,
-			"cookies", r.Cookies(),
 		)
 	}
 }

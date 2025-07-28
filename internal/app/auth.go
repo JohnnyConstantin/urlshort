@@ -25,13 +25,13 @@ func (h *Handler) WithAuth(hf http.HandlerFunc) http.HandlerFunc {
 		// Попытка аутентификации по куке
 		cookie, err := r.Cookie("auth_user")
 		if err == nil { // если кука есть
-			decoded, err := base64.URLEncoding.DecodeString(cookie.Value) // проверка кодировки
-			if err != nil {                                               // если кодировка неверная - выдача новой куки
+			decoded, err := base64.URLEncoding.DecodeString(cookie.Value) // вытаскиваем и декодим
+			if err != nil {                                               // если ошибка в кодировке - выкидываем ошибку
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
 
-			parts := strings.Split(string(decoded), "|")
+			parts := strings.Split(string(decoded), "|") // Если нет трех |, значит неверный формат куки
 			if len(parts) != 3 {
 				http.Error(w, errors.New("invalid cookie").Error(), http.StatusBadRequest)
 				return
@@ -42,8 +42,8 @@ func (h *Handler) WithAuth(hf http.HandlerFunc) http.HandlerFunc {
 			timestampStr := parts[1]
 			signature := parts[2]
 
-			if userID == "" {
-				http.Error(w, "No such user", http.StatusUnauthorized)
+			if userID == "" { // Кажется, что затриггерить это невозможно, потому что в тестах клиент получает куку от сервера
+				http.Error(w, "No such user", http.StatusUnauthorized) // 401 Unauthorized
 				return
 			}
 
@@ -52,7 +52,7 @@ func (h *Handler) WithAuth(hf http.HandlerFunc) http.HandlerFunc {
 			timestamp := time.Unix(timestampInt, 0)
 
 			expectedSig := auth.CreateSignature(userID, timestamp)
-			if !hmac.Equal([]byte(signature), []byte(expectedSig)) {
+			if !hmac.Equal([]byte(signature), []byte(expectedSig)) { // Если неверная подпись, выдаем новую куку
 				userID, err = authenticate(w)
 				if err != nil {
 					http.Error(w, err.Error(), http.StatusInternalServerError)

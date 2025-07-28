@@ -21,7 +21,7 @@ func CreateAuthCookie(userID string) (*http.Cookie, error) {
 	now := time.Now()
 	signature := CreateSignature(userID, now)
 
-	value := fmt.Sprintf("%s|%d|%s", userID, now.Unix(), signature)
+	value := fmt.Sprintf("%s|%d|%s", userID, now.Unix(), signature) // Задаем формат куки
 	encoded := base64.URLEncoding.EncodeToString([]byte(value))
 
 	return &http.Cookie{
@@ -29,8 +29,8 @@ func CreateAuthCookie(userID string) (*http.Cookie, error) {
 		Value:    encoded,
 		Path:     "/",
 		MaxAge:   30 * 24 * 60 * 60,
-		Secure:   false,
-		HttpOnly: true,
+		Secure:   false, // Несколько часов пытался понять, почему кука не приходит - оказалось ждал HTTPS, вместо HTTP
+		HttpOnly: true,  // Поэтому добавил это, чтобы наверняка
 		SameSite: http.SameSiteLaxMode,
 	}, nil
 }

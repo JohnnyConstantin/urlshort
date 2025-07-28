@@ -265,8 +265,7 @@ func (h *Handler) DeleteHandlerMultiple(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	ctx := r.Context()
-	if err := deleter.DeleteURL(ctx, userID, shortURLs); err != nil {
+	if err := deleter.DeleteURL(userID, shortURLs); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
