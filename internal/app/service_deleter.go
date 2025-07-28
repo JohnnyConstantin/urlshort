@@ -46,18 +46,18 @@ func (s *DBDeleter) DeleteURL(userID string, shortURLs []string) error {
 		}()
 	}
 
+	// Fan-in. собираем результаты. Inputchan закрывается ранее
+	go func() {
+		wg.Wait()
+		close(errChan)
+	}()
+
 	// Обработка ошибок
 	for err := range errChan {
 		if err != nil {
 			return err
 		}
 	}
-
-	// Fan-in. собираем результаты. Inputchan закрывается ранее
-	go func() {
-		wg.Wait()
-		close(errChan)
-	}()
 
 	return nil
 
