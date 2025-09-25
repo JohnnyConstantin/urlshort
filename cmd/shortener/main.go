@@ -8,7 +8,9 @@ import (
 	"github.com/JohnnyConstantin/urlshort/internal/store"
 	route "github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
+	"log"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 )
 
@@ -17,6 +19,11 @@ var sugar zap.SugaredLogger
 func main() {
 	var s app.Server
 	server := s.NewServer()
+
+	// Запускаем HTTP-сервер для профилирования в отдельной горутине
+	go func() {
+		log.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
 
 	//Чтобы удобнее было работать
 	handler := server.Handler
