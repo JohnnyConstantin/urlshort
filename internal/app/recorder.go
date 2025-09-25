@@ -3,12 +3,14 @@ package app
 import (
 	"bufio"
 	"encoding/json"
+	"io"
+	"os"
+
+	"go.uber.org/zap"
+
 	"github.com/JohnnyConstantin/urlshort/internal/config"
 	"github.com/JohnnyConstantin/urlshort/internal/store"
 	"github.com/JohnnyConstantin/urlshort/models"
-	"go.uber.org/zap"
-	"io"
-	"os"
 )
 
 // SaveToFile сохранение объекта URLRecord в файл

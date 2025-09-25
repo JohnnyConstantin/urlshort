@@ -6,11 +6,13 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	auth "github.com/JohnnyConstantin/urlshort/internal/auth"
-	"github.com/google/uuid"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
+
+	auth "github.com/JohnnyConstantin/urlshort/internal/auth"
 )
 
 type myKeyType string

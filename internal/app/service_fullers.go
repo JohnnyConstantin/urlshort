@@ -2,10 +2,11 @@ package app
 
 import (
 	"database/sql"
+	"sync"
+
 	"github.com/JohnnyConstantin/urlshort/internal/config"
 	"github.com/JohnnyConstantin/urlshort/internal/store"
 	"github.com/JohnnyConstantin/urlshort/models"
-	"sync"
 )
 
 type DBFuller struct {

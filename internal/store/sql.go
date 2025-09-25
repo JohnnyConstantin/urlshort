@@ -5,11 +5,13 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/JohnnyConstantin/urlshort/internal/config"
-	"github.com/JohnnyConstantin/urlshort/models"
+	"net/http"
+
 	"github.com/jackc/pgx/v5/pgconn"
 	_ "github.com/jackc/pgx/v5/stdlib"
-	"net/http"
+
+	"github.com/JohnnyConstantin/urlshort/internal/config"
+	"github.com/JohnnyConstantin/urlshort/models"
 )
 
 type DB struct {

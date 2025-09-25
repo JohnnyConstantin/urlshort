@@ -2,11 +2,13 @@ package app
 
 import (
 	"database/sql"
+	"sync"
+
+	"github.com/google/uuid"
+
 	"github.com/JohnnyConstantin/urlshort/internal/config"
 	"github.com/JohnnyConstantin/urlshort/internal/store"
 	"github.com/JohnnyConstantin/urlshort/models"
-	"github.com/google/uuid"
-	"sync"
 )
 
 type DBShortener struct {

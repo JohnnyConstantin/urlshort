@@ -2,9 +2,10 @@ package app
 
 import (
 	"database/sql"
+	"sync"
+
 	"github.com/JohnnyConstantin/urlshort/internal/config"
 	"github.com/JohnnyConstantin/urlshort/internal/store"
-	"sync"
 )
 
 // Возможно в будущем появятся разные реализации удаления
