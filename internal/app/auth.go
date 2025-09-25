@@ -12,7 +12,7 @@ import (
 
 	"github.com/google/uuid"
 
-	auth "github.com/JohnnyConstantin/urlshort/internal/auth"
+	auth "github.com/JohnnyConstantin/urlshort/auth"
 )
 
 type myKeyType string

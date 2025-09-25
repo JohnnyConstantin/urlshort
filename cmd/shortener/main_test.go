@@ -32,8 +32,8 @@ func TestCreateHandlers(t *testing.T) {
 	logger := zaptest.NewLogger(t)
 	sugar := *logger.Sugar()
 
-	// Создаем mock базу данных
-	db := &sql.DB{} // Пустая структура, так как мы только проверяем маршруты
+	// Создаем пустую бд
+	db := &sql.DB{}
 
 	// Создаем тестовый handler
 	var s app.Server
