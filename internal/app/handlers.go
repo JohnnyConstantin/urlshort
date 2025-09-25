@@ -9,6 +9,7 @@ import (
 	"github.com/JohnnyConstantin/urlshort/models"
 	"io"
 	"net/http"
+	_ "net/http/pprof"
 	"strings"
 )
 
@@ -94,19 +95,17 @@ func (h *Handler) PostHandler(w http.ResponseWriter, r *http.Request) {
 	var OriginalURL models.ShortenRequest
 	var status int
 
-	body, err := io.ReadAll(r.Body)
+	// Доп. обработка тела
+	// Ограничиваем размер тела запроса
+	maxSize := int64(1024 * 1024)
+	limitedReader := io.LimitReader(r.Body, maxSize)
+
+	body, err := io.ReadAll(limitedReader)
 	if err != nil {
 		http.Error(w, store.ReadBodyError, store.DefaultErrorCode)
 		return
 	}
 	defer r.Body.Close()
-
-	// Доп. обработка тела
-	// Ограничиваем размер тела запроса
-	if len(body) > 1024*1024 { // 1MB
-		http.Error(w, store.LargeBodyError, store.DefaultErrorCode)
-		return
-	}
 
 	if r.Header.Get("Content-Type") == "application/json" {
 		if err = json.Unmarshal(body, &OriginalURL); err != nil {
@@ -165,19 +164,17 @@ func (h *Handler) PostHandlerMultiple(w http.ResponseWriter, r *http.Request) {
 	var ShortURL models.ShortenResponse
 	var status int
 
-	body, err := io.ReadAll(r.Body)
+	// Доп. обработка тела
+	// Ограничиваем размер тела запроса
+	maxSize := int64(1024 * 1024)
+	limitedReader := io.LimitReader(r.Body, maxSize)
+	body, err := io.ReadAll(limitedReader)
+
 	if err != nil {
 		http.Error(w, store.ReadBodyError, store.DefaultErrorCode)
 		return
 	}
 	defer r.Body.Close()
-
-	// Доп. обработка тела
-	// Ограничиваем размер тела запроса
-	if len(body) > 1024*1024 { // 1MB
-		http.Error(w, store.LargeBodyError, store.DefaultErrorCode)
-		return
-	}
 
 	if err := json.Unmarshal(body, &requests); err != nil {
 		http.Error(w, "Invalid batch request format", store.DefaultErrorCode)
