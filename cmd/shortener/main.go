@@ -67,18 +67,35 @@ func createHandlers(db *sql.DB, router *route.Mux, sugar zap.SugaredLogger, hand
 	router.Route("/", func(r route.Router) {
 		r.Post("/",
 			app.GzipHandle( // Сжатие
-				app.WithLogging(db, // Логирование, прокидываем в него регистратор логов sugar
-					handler.PostHandler, sugar))) // Сам хендлер
+				app.WithLogging(db,
+					handler.WithAuth( // Логирование, прокидываем в него регистратор логов sugar
+						handler.PostHandler), sugar))) // Сам хендлер
 		r.Route("/api", func(r route.Router) {
 			r.Route("/shorten", func(r route.Router) {
 				r.Post("/",
 					app.GzipHandle( // Сжатие
 						app.WithLogging(db, // Логирование, прокидываем в него регистратор логов sugar
-							handler.PostHandler, sugar))) // Сам хендлер
+							handler.WithAuth( // Добавляем аутентификацию
+								handler.PostHandler), sugar))) // Сам хендлер
 				r.Post("/batch",
 					app.GzipHandle( // Сжатие
+						app.WithLogging(db,
+							handler.WithAuth( // Логирование, прокидываем в него регистратор логов sugar
+								handler.PostHandlerMultiple), sugar))) // Сам хендлер
+
+			})
+			r.Route("/user", func(r route.Router) {
+				r.Delete("/urls",
+					app.GzipHandle( // Сжатие
 						app.WithLogging(db, // Логирование, прокидываем в него регистратор логов sugar
-							handler.PostHandlerMultiple, sugar))) // Сам хендлер
+							handler.WithAuth( // Добавляем аутентификацию
+								handler.DeleteHandlerMultiple), sugar))) // Сам хендлер
+				r.Get(
+					"/urls",
+					app.GzipHandle( // Сжатие
+						app.WithLogging(db, // Логирование, прокидываем в него регистратор логов sugar
+							handler.WithAuth( //Добавляем аутентификацию
+								handler.GetHandlerMultiple), sugar))) // Сам хендлер
 
 			})
 		})
@@ -111,6 +128,12 @@ func loadEnvs() {
 	if ok && envD != "" {
 		config.Options.DSN = envD
 	}
+
+	envE, ok := os.LookupEnv("SECRET_KEY")
+	if ok && envE != "" {
+		config.Options.SecretKey = envE
+	}
+
 }
 
 func storageDecider() (*sql.DB, error) {
