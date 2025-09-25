@@ -3,15 +3,17 @@ package app
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/JohnnyConstantin/urlshort/internal/config"
-	"github.com/JohnnyConstantin/urlshort/internal/store"
-	"github.com/JohnnyConstantin/urlshort/models"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/JohnnyConstantin/urlshort/internal/config"
+	"github.com/JohnnyConstantin/urlshort/internal/store"
+	"github.com/JohnnyConstantin/urlshort/models"
 )
 
 // TestPostHandler проверяет хендлер POST запросов

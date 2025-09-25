@@ -1,9 +1,10 @@
 package app
 
 import (
-	"github.com/JohnnyConstantin/urlshort/internal/store"
 	"net/http"
 	"strings"
+
+	"github.com/JohnnyConstantin/urlshort/internal/store"
 )
 
 type Router struct {

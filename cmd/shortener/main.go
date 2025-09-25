@@ -3,15 +3,17 @@ package main
 import (
 	"database/sql"
 	"flag"
-	"github.com/JohnnyConstantin/urlshort/internal/app"
-	"github.com/JohnnyConstantin/urlshort/internal/config"
-	"github.com/JohnnyConstantin/urlshort/internal/store"
-	route "github.com/go-chi/chi/v5"
-	"go.uber.org/zap"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+
+	route "github.com/go-chi/chi/v5"
+	"go.uber.org/zap"
+
+	"github.com/JohnnyConstantin/urlshort/internal/app"
+	"github.com/JohnnyConstantin/urlshort/internal/config"
+	"github.com/JohnnyConstantin/urlshort/internal/store"
 )
 
 var sugar zap.SugaredLogger

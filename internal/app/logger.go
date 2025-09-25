@@ -3,9 +3,10 @@ package app
 import (
 	"context"
 	"database/sql"
-	"go.uber.org/zap"
 	"net/http"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 type key string

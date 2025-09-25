@@ -4,13 +4,14 @@ import (
 	"compress/gzip"
 	"database/sql"
 	"encoding/json"
-	"github.com/JohnnyConstantin/urlshort/internal/config"
-	"github.com/JohnnyConstantin/urlshort/internal/store"
-	"github.com/JohnnyConstantin/urlshort/models"
 	"io"
 	"net/http"
 	_ "net/http/pprof"
 	"strings"
+
+	"github.com/JohnnyConstantin/urlshort/internal/config"
+	"github.com/JohnnyConstantin/urlshort/internal/store"
+	"github.com/JohnnyConstantin/urlshort/models"
 )
 
 type Handler struct {
