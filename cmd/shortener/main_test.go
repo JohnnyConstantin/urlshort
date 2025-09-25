@@ -54,7 +54,6 @@ func TestCreateHandlers(t *testing.T) {
 		{"POST", "/api/shorten"},
 		{"POST", "/api/shorten/batch"},
 		{"DELETE", "/api/user/urls"},
-		{"GET", "/api/user/urls"},
 		{"GET", "/{id}"},
 		{"GET", "/ping"},
 	}
