@@ -11,6 +11,7 @@ type gzipWriter struct {
 	Writer io.Writer
 }
 
+// Write реализация метода Write для gzipWriter с дополнительными проверками Content-Type
 func (g *gzipWriter) Write(b []byte) (int, error) {
 	contentType := g.Header().Get("Content-Type")
 	// Дополнительная проверка здесь, на случай если в одном из middleware хендлеров в дальнейшем будет изменяться contentType

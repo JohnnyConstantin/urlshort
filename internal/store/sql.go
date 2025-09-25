@@ -1,3 +1,4 @@
+// Package store Реализует взаимодействие с хранилищем данных, а также содержит словарь кодов/текстов ошибок
 package store
 
 import (
@@ -14,10 +15,12 @@ import (
 	"github.com/JohnnyConstantin/urlshort/models"
 )
 
+// DB Объект базы данных
 type DB struct {
 	DB *sql.DB
 }
 
+// OpenDB Открыть соединение с БД
 func (d *DB) OpenDB(connStr string) error {
 	sqlDB, err := sql.Open("pgx", connStr)
 	if err != nil {
@@ -145,6 +148,7 @@ func ReadWithUUID(db *sql.DB, userID string) ([]models.URLResponse, error) {
 	return result, nil
 }
 
+// DeleteURLs Удаление ссылок
 func DeleteURLs(db *sql.DB, userID string, batch []string) error {
 
 	tx, err := db.Begin()

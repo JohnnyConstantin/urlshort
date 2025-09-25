@@ -1,3 +1,4 @@
+// Package auth отвечает за создание сигнатур и кук для авторизации и аутентификации
 package auth
 
 import (
@@ -11,6 +12,7 @@ import (
 	"github.com/JohnnyConstantin/urlshort/internal/config"
 )
 
+// CreateSignature создает подпись
 func CreateSignature(userID string, timestamp time.Time) string {
 	h := hmac.New(sha256.New, []byte(config.Options.SecretKey))
 	data := fmt.Sprintf("%s|%d", userID, timestamp.Unix())
@@ -18,6 +20,7 @@ func CreateSignature(userID string, timestamp time.Time) string {
 	return base64.URLEncoding.EncodeToString(h.Sum(nil))
 }
 
+// CreateAuthCookie создает куку
 func CreateAuthCookie(userID string) (*http.Cookie, error) {
 	now := time.Now()
 	signature := CreateSignature(userID, now)

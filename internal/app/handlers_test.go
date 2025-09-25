@@ -2,7 +2,9 @@ package app
 
 import (
 	"bytes"
+	"compress/gzip"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -232,6 +234,195 @@ func TestPostHandlerMultiple(t *testing.T) {
 			} else {
 				// Проверка ошибки - тело должно содержать сообщение об ошибке
 				assert.NotEmpty(t, rr.Body.String(), "Error response should not be empty")
+			}
+		})
+	}
+}
+
+// Вспомогательная функция для создания gzip сжатых данных
+func gzipData(data string) ([]byte, error) {
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	if _, err := gz.Write([]byte(data)); err != nil {
+		return nil, err
+	}
+	if err := gz.Close(); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// Тестовый хендлер для проверки
+func testHandler(w http.ResponseWriter, r *http.Request) {
+	body, _ := io.ReadAll(r.Body)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(body) // Эхо-ответ с телом запроса
+}
+
+func TestGzipHandle(t *testing.T) {
+	tests := []struct {
+		name                string
+		contentEncoding     string
+		acceptEncoding      string
+		contentType         string
+		requestBody         string
+		compressRequestBody bool
+		expectGzipResponse  bool
+		expectError         bool
+		expectedStatusCode  int
+	}{
+		{
+			name:                "Gzip request and response",
+			contentEncoding:     "gzip",
+			acceptEncoding:      "gzip",
+			contentType:         "application/json",
+			requestBody:         `{"test": "data"}`,
+			compressRequestBody: true,
+			expectGzipResponse:  true,
+			expectedStatusCode:  http.StatusOK,
+		},
+		{
+			name:                "Gzip request without gzip acceptance",
+			contentEncoding:     "gzip",
+			acceptEncoding:      "",
+			contentType:         "application/json",
+			requestBody:         `{"test": "data"}`,
+			compressRequestBody: true,
+			expectGzipResponse:  false,
+			expectedStatusCode:  http.StatusOK,
+		},
+		{
+			name:                "Non-gzip request with gzip acceptance",
+			contentEncoding:     "",
+			acceptEncoding:      "gzip",
+			contentType:         "application/json",
+			requestBody:         `{"test": "data"}`,
+			compressRequestBody: false,
+			expectGzipResponse:  true,
+			expectedStatusCode:  http.StatusOK,
+		},
+		{
+			name:                "Invalid gzip body",
+			contentEncoding:     "gzip",
+			acceptEncoding:      "gzip",
+			contentType:         "application/json",
+			requestBody:         "invalid gzip data",
+			compressRequestBody: false, // Отправляем не сжатые данные с заголовком gzip
+			expectError:         true,
+			expectedStatusCode:  http.StatusBadRequest,
+		},
+		{
+			name:                "Gzip acceptance but non-compressible content type",
+			contentEncoding:     "",
+			acceptEncoding:      "gzip",
+			contentType:         "image/png",
+			requestBody:         "binary data",
+			compressRequestBody: false,
+			expectGzipResponse:  false,
+			expectedStatusCode:  http.StatusOK,
+		},
+		{
+			name:                "Text HTML with gzip",
+			contentEncoding:     "",
+			acceptEncoding:      "gzip",
+			contentType:         "text/html",
+			requestBody:         "<html><body>Test</body></html>",
+			compressRequestBody: false,
+			expectGzipResponse:  true,
+			expectedStatusCode:  http.StatusOK,
+		},
+		{
+			name:                "No compression needed",
+			contentEncoding:     "",
+			acceptEncoding:      "",
+			contentType:         "application/json",
+			requestBody:         `{"test": "data"}`,
+			compressRequestBody: false,
+			expectGzipResponse:  false,
+			expectedStatusCode:  http.StatusOK,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Подготовка тела запроса
+			var body io.Reader
+			if tt.compressRequestBody {
+				compressed, err := gzipData(tt.requestBody)
+				if err != nil {
+					t.Fatalf("Failed to compress test data: %v", err)
+				}
+				body = bytes.NewReader(compressed)
+			} else {
+				body = strings.NewReader(tt.requestBody)
+			}
+
+			// Создание запроса
+			req := httptest.NewRequest("POST", "/test", body)
+			req.Header.Set("Content-Encoding", tt.contentEncoding)
+			req.Header.Set("Accept-Encoding", tt.acceptEncoding)
+			req.Header.Set("Content-Type", tt.contentType)
+
+			// Создание ResponseRecorder
+			rr := httptest.NewRecorder()
+
+			// Создание middleware с тестовым хендлером
+			handler := GzipHandle(testHandler)
+
+			// Выполнение запроса
+			handler.ServeHTTP(rr, req)
+
+			// Проверка статус кода
+			if rr.Code != tt.expectedStatusCode {
+				t.Errorf("Expected status code %d, got %d", tt.expectedStatusCode, rr.Code)
+			}
+
+			// Если ожидалась ошибка, проверяем сообщение
+			if tt.expectError {
+				if !strings.Contains(rr.Body.String(), "Invalid gzip body") {
+					t.Errorf("Expected error message 'Invalid gzip body', got: %s", rr.Body.String())
+				}
+				return
+			}
+
+			// Проверка заголовков ответа
+			contentEncoding := rr.Header().Get("Content-Encoding")
+			if tt.expectGzipResponse {
+				if contentEncoding != "gzip" {
+					t.Errorf("Expected Content-Encoding: gzip, got: %s", contentEncoding)
+				}
+
+				// Проверяем, что ответ действительно сжат
+				if strings.Contains(contentEncoding, "gzip") {
+					// Пытаемся распаковать ответ
+					gr, err := gzip.NewReader(rr.Body)
+					if err != nil {
+						t.Errorf("Response is not valid gzip: %v", err)
+					}
+					defer gr.Close()
+
+					uncompressed, err := io.ReadAll(gr)
+					if err != nil {
+						t.Errorf("Failed to decompress response: %v", err)
+					}
+
+					// Проверяем, что распакованные данные совпадают с исходными
+					if string(uncompressed) != tt.requestBody {
+						t.Errorf("Decompressed response doesn't match expected. Expected: %s, Got: %s",
+							tt.requestBody, string(uncompressed))
+					}
+				}
+			} else {
+				if contentEncoding != "" {
+					t.Errorf("Expected no Content-Encoding, got: %s", contentEncoding)
+				}
+
+				// Проверяем, что ответ не сжат
+				if rr.Body.String() != tt.requestBody {
+					t.Errorf("Response body doesn't match expected. Expected: %s, Got: %s",
+						tt.requestBody, rr.Body.String())
+				}
 			}
 		})
 	}

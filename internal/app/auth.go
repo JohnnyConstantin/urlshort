@@ -21,6 +21,7 @@ const (
 	user myKeyType = "user"
 )
 
+// WithAuth мидлварь, которая осуществляет аутентификацию к последующему хендлеру
 func (h *Handler) WithAuth(hf http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 

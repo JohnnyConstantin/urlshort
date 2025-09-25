@@ -7,6 +7,7 @@ import (
 	"github.com/JohnnyConstantin/urlshort/internal/store"
 )
 
+// Router Роутер, содержащий в себе список хендлеров (позволяет легко масштабировать количество хендлеров)
 type Router struct {
 	Routes map[string]map[string]http.HandlerFunc
 }

@@ -4,6 +4,7 @@ import (
 	"compress/gzip"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	_ "net/http/pprof"
@@ -14,6 +15,7 @@ import (
 	"github.com/JohnnyConstantin/urlshort/models"
 )
 
+// Handler Объект хендлера
 type Handler struct {
 	router *Router
 }
@@ -131,15 +133,9 @@ func (h *Handler) PostHandler(w http.ResponseWriter, r *http.Request) {
 		status = http.StatusCreated
 		ShortURL = shortener.ShortenURL(OriginalURL.URL)
 	case config.StorageDB:
-		db, ok := r.Context().Value(dbKey).(*sql.DB)
-		if !ok {
-			http.Error(w, "DB not in context", http.StatusInternalServerError)
-			return
-		}
-		//userID := "123456789"
-		userID, ok := r.Context().Value(user).(string)
-		if !ok {
-			http.Error(w, "userID not found in context", http.StatusInternalServerError)
+		db, userID, err := initCtx(r)
+		if err != nil {
+			http.Error(w, err.Error(), store.InternalSeverErrorCode)
 			return
 		}
 		shortener := DBShortener{cfg, db}
@@ -212,14 +208,9 @@ func (h *Handler) PostHandlerMultiple(w http.ResponseWriter, r *http.Request) {
 			})
 		}
 	case config.StorageDB:
-		db, ok := r.Context().Value(dbKey).(*sql.DB)
-		if !ok {
-			http.Error(w, "DB not in context", http.StatusInternalServerError)
-			return
-		}
-		userID, ok := r.Context().Value(user).(string)
-		if !ok {
-			http.Error(w, "userID not found in context", http.StatusInternalServerError)
+		db, userID, err := initCtx(r)
+		if err != nil {
+			http.Error(w, err.Error(), store.InternalSeverErrorCode)
 			return
 		}
 		shortener := DBShortener{cfg, db}
@@ -242,15 +233,11 @@ func (h *Handler) PostHandlerMultiple(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// DeleteHandlerMultiple удаляет несколько записей ссылок
 func (h *Handler) DeleteHandlerMultiple(w http.ResponseWriter, r *http.Request) {
-	db, ok := r.Context().Value(dbKey).(*sql.DB)
-	if !ok {
-		http.Error(w, "DB not in context", http.StatusInternalServerError)
-		return
-	}
-	userID, ok := r.Context().Value(user).(string)
-	if !ok {
-		http.Error(w, "userID not found in context", http.StatusInternalServerError)
+	db, userID, err := initCtx(r)
+	if err != nil {
+		http.Error(w, err.Error(), store.InternalSeverErrorCode)
 		return
 	}
 
@@ -270,15 +257,11 @@ func (h *Handler) DeleteHandlerMultiple(w http.ResponseWriter, r *http.Request) 
 	w.WriteHeader(http.StatusAccepted)
 }
 
+// GetHandlerMultiple получить несколько полных URL по сокращенным
 func (h *Handler) GetHandlerMultiple(w http.ResponseWriter, r *http.Request) {
-	db, ok := r.Context().Value(dbKey).(*sql.DB)
-	if !ok {
-		http.Error(w, "DB not in context", http.StatusInternalServerError)
-		return
-	}
-	userID, ok := r.Context().Value(user).(string)
-	if !ok {
-		http.Error(w, "userID not found in context", http.StatusInternalServerError)
+	db, userID, err := initCtx(r)
+	if err != nil {
+		http.Error(w, err.Error(), store.InternalSeverErrorCode)
 		return
 	}
 
@@ -299,9 +282,10 @@ func (h *Handler) GetHandlerMultiple(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(307)
+	w.WriteHeader(http.StatusTemporaryRedirect)
 }
 
+// GzipHandle мидлварь для работы со сжатием
 func GzipHandle(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Проверка на то, что клиент прислал пожатый контент
@@ -353,4 +337,17 @@ func (h *Handler) PingDBHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+func initCtx(r *http.Request) (*sql.DB, string, error) {
+	db, ok := r.Context().Value(dbKey).(*sql.DB)
+	if !ok {
+		return nil, "", errors.New("DB not in context")
+	}
+	userID, ok := r.Context().Value(user).(string)
+	if !ok {
+		return nil, "", errors.New("userID not found in context")
+	}
+
+	return db, userID, nil
 }

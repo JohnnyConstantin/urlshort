@@ -1,3 +1,4 @@
+// Package models содержит структуры запросов/ответов
 package models
 
 // ShortenRequest Объект, содержащий полный URL

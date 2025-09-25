@@ -27,6 +27,7 @@ type (
 	}
 )
 
+// Реализация метода Write для logger
 func (r *loggingResponseWriter) Write(b []byte) (int, error) {
 	// Записываем ответ, используя оригинальный http.ResponseWriter
 	size, err := r.ResponseWriter.Write(b)
@@ -34,12 +35,14 @@ func (r *loggingResponseWriter) Write(b []byte) (int, error) {
 	return size, err
 }
 
+// Реализация метода WriteHeader для logger
 func (r *loggingResponseWriter) WriteHeader(statusCode int) {
 	// Записываем код статуса, используя оригинальный http.ResponseWriter
 	r.ResponseWriter.WriteHeader(statusCode)
 	r.responseData.status = statusCode // захватываем код статуса
 }
 
+// WithLogging мидлварь, отвечающая за логирование запросов и ответов
 func WithLogging(db *sql.DB, h http.HandlerFunc, logger zap.SugaredLogger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now() // Засекаем
