@@ -5,9 +5,10 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
-	"github.com/JohnnyConstantin/urlshort/internal/config"
 	"net/http"
 	"time"
+
+	"github.com/JohnnyConstantin/urlshort/internal/config"
 )
 
 func CreateSignature(userID string, timestamp time.Time) string {

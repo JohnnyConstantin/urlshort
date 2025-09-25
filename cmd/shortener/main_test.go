@@ -1,9 +1,11 @@
 package main
 
 import (
-	"github.com/JohnnyConstantin/urlshort/internal/app"
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
+
+	"github.com/JohnnyConstantin/urlshort/internal/app"
 )
 
 // TestServerCreation проверяет корректность создания сервера
