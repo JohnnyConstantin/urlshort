@@ -1,5 +1,7 @@
+// Package app создает новый объект сервера с хендлером и роутером
 package app
 
+// Server объект сервера, имеющий хендлер и роутер
 type Server struct {
 	Handler *Handler
 	Router  *Router

@@ -1,23 +1,29 @@
+// Package config содержит основные параметры конфигурации,
+// а также реализует логику выбора хранилища данных и парсинга переменных окружения
 package config
 
 import (
 	"flag"
 )
 
+// StorageType тип хранилища
 type StorageType string
 
+// виды хранилища
 const (
 	StorageMemory StorageType = "memory"
 	StorageFile   StorageType = "file"
 	StorageDB     StorageType = "postgres"
 )
 
+// внутренние параметры для разработчика
 var (
 	AppName   = "shortener" // В дальнейшем может использоваться для CLI интерфейса
 	PathToENV = ".env"      //Должен использоваться для подключения к БД
 	Version   = "0.0.0.1-local"
 )
 
+// Options опции запуска сервера
 var Options struct {
 	Address     string
 	BaseAddress string
@@ -26,8 +32,10 @@ var Options struct {
 	SecretKey   string
 }
 
+// Config Объект глобального конфига
 var Config StorageConfig
 
+// StorageConfig Объект конфига хранилища
 type StorageConfig struct {
 	StorageType StorageType
 	DatabaseDSN string // DSN для PostgreSQL (опциональное)
@@ -91,6 +99,7 @@ func CreateStorageConfig() {
 	}
 }
 
+// GetStorageConfig геттер для конфига
 func GetStorageConfig() StorageConfig {
 	return Config
 }
