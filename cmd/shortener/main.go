@@ -37,7 +37,12 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	defer logger.Sync()
+	defer func(logger *zap.Logger) {
+		err = logger.Sync()
+		if err != nil {
+			panic(err)
+		}
+	}(logger)
 
 	sugar = *logger.Sugar() // Создали экземпляр и в дальнейшем прокидываем его в middleware с логированием
 
@@ -55,12 +60,17 @@ func main() {
 	// Создание и применение конфигурации. Если ошибка - выход с ненулевым кодом. Ошибка при этом логируется в sugar
 	db, err := storageDecider()
 	if err != nil {
-		os.Exit(1)
+		panic(err)
 	}
 
 	//Если вернулся хендлер к БД (т.е. успешно создано соединение к БД), то закрываем после завершения программы
 	if db != nil {
-		defer db.Close()
+		defer func(db *sql.DB) {
+			err = db.Close()
+			if err != nil {
+				panic(err)
+			}
+		}(db)
 	}
 
 	// Вынес создание роутов в отдельную функцию

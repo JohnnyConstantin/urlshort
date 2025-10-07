@@ -51,7 +51,11 @@ func (h *Handler) WithAuth(hf http.HandlerFunc) http.HandlerFunc {
 			}
 
 			timestampInt := int64(0)
-			fmt.Sscanf(timestampStr, "%d", &timestampInt)
+			_, err = fmt.Sscanf(timestampStr, "%d", &timestampInt)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
 			timestamp := time.Unix(timestampInt, 0)
 
 			expectedSig := auth.CreateSignature(userID, timestamp)

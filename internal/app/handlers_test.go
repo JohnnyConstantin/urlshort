@@ -133,12 +133,12 @@ func TestPostHandlerMultiple(t *testing.T) {
 	handler := server.Handler
 
 	tests := []struct {
+		setupContext   func(r *http.Request) *http.Request
 		name           string
 		requestBody    string
 		storageType    config.StorageType
 		expectedStatus int
 		wantError      bool
-		setupContext   func(r *http.Request) *http.Request
 	}{
 		{
 			name: "Successful batch request with memory storage",
@@ -219,7 +219,10 @@ func TestPostHandlerMultiple(t *testing.T) {
 				// Для непустых запросов проверяем соответствие количества элементов
 				if tt.requestBody != "[]" {
 					var requests []models.BatchShortenRequest
-					json.Unmarshal([]byte(tt.requestBody), &requests)
+					err = json.Unmarshal([]byte(tt.requestBody), &requests)
+					if err != nil {
+						return
+					}
 					assert.Equal(t, len(requests), len(responses), "Number of responses should match requests")
 
 					// Проверяем, что correlation_id сохранились
@@ -257,7 +260,10 @@ func testHandler(w http.ResponseWriter, r *http.Request) {
 	body, _ := io.ReadAll(r.Body)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write(body) // Эхо-ответ с телом запроса
+	_, err := w.Write(body)
+	if err != nil {
+		return
+	} // Эхо-ответ с телом запроса
 }
 
 func TestGzipHandle(t *testing.T) {
@@ -400,7 +406,13 @@ func TestGzipHandle(t *testing.T) {
 					if err != nil {
 						t.Errorf("Response is not valid gzip: %v", err)
 					}
-					defer gr.Close()
+					defer func(gr *gzip.Reader) {
+						err = gr.Close()
+						if err != nil {
+							http.Error(rr, err.Error(), http.StatusInternalServerError)
+							return
+						}
+					}(gr)
 
 					uncompressed, err := io.ReadAll(gr)
 					if err != nil {

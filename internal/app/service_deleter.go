@@ -8,10 +8,10 @@ import (
 	"github.com/JohnnyConstantin/urlshort/internal/store"
 )
 
-// Возможно в будущем появятся разные реализации удаления
+// DBDeleter Возможно в будущем появятся разные реализации удаления
 type DBDeleter struct {
-	cfg config.StorageConfig
 	db  *sql.DB
+	cfg config.StorageConfig
 }
 
 // DeleteURL удалить URL в БД
