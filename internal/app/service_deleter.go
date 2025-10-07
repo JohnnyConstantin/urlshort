@@ -2,9 +2,10 @@ package app
 
 import (
 	"database/sql"
+	"sync"
+
 	"github.com/JohnnyConstantin/urlshort/internal/config"
 	"github.com/JohnnyConstantin/urlshort/internal/store"
-	"sync"
 )
 
 // Возможно в будущем появятся разные реализации удаления
@@ -13,6 +14,7 @@ type DBDeleter struct {
 	db  *sql.DB
 }
 
+// DeleteURL удалить URL в БД
 func (s *DBDeleter) DeleteURL(userID string, shortURLs []string) error {
 
 	if len(shortURLs) == 0 {

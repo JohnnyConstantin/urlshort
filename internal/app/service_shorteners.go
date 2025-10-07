@@ -2,36 +2,44 @@ package app
 
 import (
 	"database/sql"
+	"sync"
+
+	"github.com/google/uuid"
+
 	"github.com/JohnnyConstantin/urlshort/internal/config"
 	"github.com/JohnnyConstantin/urlshort/internal/store"
 	"github.com/JohnnyConstantin/urlshort/models"
-	"github.com/google/uuid"
-	"sync"
 )
 
+// DBShortener объект "сворачивания" URL c использованием БД
 type DBShortener struct {
 	cfg config.StorageConfig
 	db  *sql.DB
 }
 
+// FileShortener объект "сворачивания" URL c использованием файла
 type FileShortener struct {
 	cfg config.StorageConfig
 	mu  *sync.Mutex
 }
 
-func (s *FileShortener) InitMutex() {
-	s.mu = new(sync.Mutex)
-}
-
+// MemoryShortener объект "сворачивания" URL c использованием памяти
 type MemoryShortener struct {
 	cfg config.StorageConfig
 	mu  *sync.Mutex
 }
 
+// InitMutex создание мьютекса для сворачивания с файлом
+func (s *FileShortener) InitMutex() {
+	s.mu = new(sync.Mutex)
+}
+
+// InitMutex создание мьютекса для сворачивания в памяти
 func (s *MemoryShortener) InitMutex() {
 	s.mu = new(sync.Mutex)
 }
 
+// ShortenURL сокращает URL с использованием БД
 func (s *DBShortener) ShortenURL(userID string, originalURL string) (models.ShortenResponse, int) {
 	var shortenURL models.ShortenResponse
 
@@ -54,6 +62,7 @@ func (s *DBShortener) ShortenURL(userID string, originalURL string) (models.Shor
 	return shortenURL, status
 }
 
+// ShortenURL сокращает URL с использованием файла
 func (s *FileShortener) ShortenURL(originalURL string) models.ShortenResponse {
 	var shortenURL models.ShortenResponse
 
@@ -79,6 +88,7 @@ func (s *FileShortener) ShortenURL(originalURL string) models.ShortenResponse {
 	return shortenURL
 }
 
+// ShortenURL сокращает URL с использованием памяти
 func (s *MemoryShortener) ShortenURL(originalURL string) models.ShortenResponse {
 	var shortenURL models.ShortenResponse
 

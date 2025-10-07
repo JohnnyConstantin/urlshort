@@ -6,11 +6,13 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	auth "github.com/JohnnyConstantin/urlshort/internal/auth"
-	"github.com/google/uuid"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
+
+	auth "github.com/JohnnyConstantin/urlshort/auth"
 )
 
 type myKeyType string
@@ -19,6 +21,7 @@ const (
 	user myKeyType = "user"
 )
 
+// WithAuth мидлварь, которая осуществляет аутентификацию к последующему хендлеру
 func (h *Handler) WithAuth(hf http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 
