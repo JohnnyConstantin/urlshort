@@ -129,7 +129,12 @@ func ReadWithUUID(db *sql.DB, userID string) ([]models.URLResponse, error) {
 	if err != nil {
 		return nil, fmt.Errorf("database query error: %w", err)
 	}
-	defer rows.Close()
+	defer func(rows *sql.Rows) {
+		err = rows.Close()
+		if err != nil {
+			return
+		}
+	}(rows)
 
 	for rows.Next() {
 		var record models.URLResponse
@@ -155,10 +160,15 @@ func DeleteURLs(db *sql.DB, userID string, batch []string) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func(tx *sql.Tx) {
+		err = tx.Rollback()
+		if err != nil {
+			return
+		}
+	}(tx)
 
 	for _, shortURL := range batch {
-		_, err := tx.Exec("UPDATE urls SET is_deleted = true WHERE short_url = $1 AND uuid = $2", shortURL, userID)
+		_, err = tx.Exec("UPDATE urls SET is_deleted = true WHERE short_url = $1 AND uuid = $2", shortURL, userID)
 		if err != nil {
 			return err
 		}

@@ -70,7 +70,7 @@ func (h *Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "DB not in context", http.StatusInternalServerError)
 		}
 
-		fuller := DBFuller{cfg, db}
+		fuller := DBFuller{db, cfg}
 		response, exists, isDeleted = fuller.GetFullURL(id)
 		if isDeleted {
 			status = http.StatusGone
@@ -108,7 +108,12 @@ func (h *Handler) PostHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, store.ReadBodyError, store.DefaultErrorCode)
 		return
 	}
-	defer r.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err = Body.Close()
+		if err != nil {
+			return
+		}
+	}(r.Body)
 
 	if r.Header.Get("Content-Type") == "application/json" {
 		if err = json.Unmarshal(body, &OriginalURL); err != nil {
@@ -133,12 +138,12 @@ func (h *Handler) PostHandler(w http.ResponseWriter, r *http.Request) {
 		status = http.StatusCreated
 		ShortURL = shortener.ShortenURL(OriginalURL.URL)
 	case config.StorageDB:
-		db, userID, err := initCtx(r)
-		if err != nil {
-			http.Error(w, err.Error(), store.InternalSeverErrorCode)
+		db, userID, errs := initCtx(r)
+		if errs != nil {
+			http.Error(w, errs.Error(), store.InternalSeverErrorCode)
 			return
 		}
-		shortener := DBShortener{cfg, db}
+		shortener := DBShortener{db, cfg}
 		ShortURL, status = shortener.ShortenURL(string(userID), OriginalURL.URL)
 	default:
 		http.Error(w, store.DefaultError, store.DefaultErrorCode)
@@ -148,10 +153,18 @@ func (h *Handler) PostHandler(w http.ResponseWriter, r *http.Request) {
 	// Перенесенный функционал из JsonMiddleware. Необходимо для применения статус кода и json encoding для app/json Header
 	if r.Header.Get("Content-Type") == "application/json" {
 		w.WriteHeader(status)
-		json.NewEncoder(w).Encode(ShortURL)
+		err = json.NewEncoder(w).Encode(ShortURL)
+		if err != nil {
+			http.Error(w, store.BadRequestError, store.InternalSeverErrorCode)
+			return
+		}
 	} else {
 		w.WriteHeader(status)
-		w.Write([]byte(ShortURL.Result))
+		_, err := w.Write([]byte(ShortURL.Result))
+		if err != nil {
+			http.Error(w, store.DefaultError, store.InternalSeverErrorCode)
+			return
+		}
 	}
 }
 
@@ -171,7 +184,12 @@ func (h *Handler) PostHandlerMultiple(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, store.ReadBodyError, store.DefaultErrorCode)
 		return
 	}
-	defer r.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err = Body.Close()
+		if err != nil {
+			return
+		}
+	}(r.Body)
 
 	if err := json.Unmarshal(body, &requests); err != nil {
 		http.Error(w, "Invalid batch request format", store.DefaultErrorCode)
@@ -213,7 +231,7 @@ func (h *Handler) PostHandlerMultiple(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), store.InternalSeverErrorCode)
 			return
 		}
-		shortener := DBShortener{cfg, db}
+		shortener := DBShortener{db, cfg}
 		for _, req := range requests {
 			ShortURL, status = shortener.ShortenURL(userID, req.OriginalURL)
 
@@ -295,7 +313,12 @@ func GzipHandle(next http.HandlerFunc) http.HandlerFunc {
 				http.Error(w, "Invalid gzip body", http.StatusBadRequest)
 				return
 			}
-			defer gz.Close()
+			defer func(gz *gzip.Reader) {
+				err = gz.Close()
+				if err != nil {
+					return
+				}
+			}(gz)
 			r.Body = gz
 		}
 
@@ -308,7 +331,12 @@ func GzipHandle(next http.HandlerFunc) http.HandlerFunc {
 				strings.HasPrefix(contentType, "text/html") {
 
 				gzWriter := gzip.NewWriter(w) // Жмем!
-				defer gzWriter.Close()
+				defer func(gzWriter *gzip.Writer) {
+					err := gzWriter.Close()
+					if err != nil {
+						return
+					}
+				}(gzWriter)
 
 				w.Header().Set("Content-Encoding", "gzip") // Ставим заголовок, что пожали контент
 				originalWriter = &gzipWriter{
