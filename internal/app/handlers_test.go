@@ -3,7 +3,9 @@ package app
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/json"
+	"go.uber.org/zap"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -24,6 +26,14 @@ func TestPostHandler(t *testing.T) {
 	server := s.NewServer()
 	handler := server.Handler
 
+	loggers, err := zap.NewDevelopment()
+	if err != nil {
+		panic(err)
+	}
+
+	sugar := *loggers.Sugar()
+	ctx := context.WithValue(context.Background(), loggerKey, sugar)
+
 	config.CreateStorageConfig()
 	requestBody := "https://example.com"
 	req, err := http.NewRequest(http.MethodPost, "/", bytes.NewBufferString(requestBody))
@@ -32,6 +42,7 @@ func TestPostHandler(t *testing.T) {
 	}
 
 	rr := httptest.NewRecorder()
+	req = req.WithContext(ctx)
 	handler.PostHandler(rr, req)
 
 	// Проверка статуса (201)
@@ -71,6 +82,13 @@ func TestGetHandler(t *testing.T) {
 	var s Server
 	server := s.NewServer()
 	handler := server.Handler
+	loggers, err := zap.NewDevelopment()
+	if err != nil {
+		panic(err)
+	}
+
+	sugar := *loggers.Sugar()
+	ctx := context.WithValue(context.Background(), loggerKey, sugar)
 
 	// Создание короткой ссылки (на случай, если тест запускается атомарно, без TestPostHandler)
 	requestBody := testURL
@@ -78,6 +96,7 @@ func TestGetHandler(t *testing.T) {
 	require.NoErrorf(t, err, "Expected no error for POST request")
 
 	rr := httptest.NewRecorder()
+	req = req.WithContext(ctx)
 	handler.PostHandler(rr, req)
 
 	shortURL := rr.Body.Bytes()
@@ -191,12 +210,21 @@ func TestPostHandlerMultiple(t *testing.T) {
 			// Устанавливаем тип хранилища
 			config.CreateStorageConfig()
 
+			loggers, err := zap.NewDevelopment()
+			if err != nil {
+				panic(err)
+			}
+
+			sugar := *loggers.Sugar()
+			ctx := context.WithValue(context.Background(), loggerKey, sugar)
+
 			req, err := http.NewRequest(http.MethodPost, "/api/shorten/batch", bytes.NewBufferString(tt.requestBody))
 			if err != nil {
 				t.Fatal(err)
 			}
 
 			rr := httptest.NewRecorder()
+			req = req.WithContext(ctx)
 			handler.PostHandlerMultiple(rr, req)
 
 			// Проверка статуса

@@ -44,14 +44,6 @@ func (h *Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
 	path := strings.Trim(r.URL.Path, "/")
 	parts := strings.Split(path, "/")
 
-	ctx := r.Context()
-
-	sugar, ok := ctx.Value(loggerKey).(zap.SugaredLogger)
-	if !ok {
-		http.Error(w, store.DefaultError, store.InternalSeverErrorCode)
-		return
-	}
-
 	if len(parts) != 1 {
 		http.Error(w, store.BadRequestError, store.DefaultErrorCode)
 		return
@@ -76,7 +68,6 @@ func (h *Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
 		// Если StorageDB, то в context не может быть nil (на это есть проверка в main), однако, на всякий случай здесь повторяем
 		db, ok := r.Context().Value(dbKey).(*sql.DB)
 		if !ok {
-			sugar.Error("Error in getting database from context")
 			http.Error(w, store.DefaultError, store.InternalSeverErrorCode)
 			return
 		}
@@ -87,7 +78,6 @@ func (h *Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
 			status = http.StatusGone
 		}
 	default:
-		sugar.Errorf("Unsupported storage type: %v", cfg.StorageType)
 		http.Error(w, store.DefaultError, store.DefaultErrorCode)
 		return
 	}
