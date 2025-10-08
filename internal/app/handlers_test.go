@@ -63,6 +63,14 @@ func BenchmarkPostHandler(t *testing.B) {
 	server := s.NewServer()
 	handler := server.Handler
 
+	loggers, err := zap.NewDevelopment()
+	if err != nil {
+		panic(err)
+	}
+
+	sugar := *loggers.Sugar()
+	ctx := context.WithValue(context.Background(), loggerKey, sugar)
+
 	config.CreateStorageConfig()
 	requestBody := "https://example.com"
 	req, err := http.NewRequest(http.MethodPost, "/", bytes.NewBufferString(requestBody))
@@ -71,6 +79,8 @@ func BenchmarkPostHandler(t *testing.B) {
 	}
 
 	rr := httptest.NewRecorder()
+	req = req.WithContext(ctx)
+
 	t.StartTimer() // Запускаем таймер после подготовки данных
 	handler.PostHandler(rr, req)
 }
@@ -104,6 +114,7 @@ func TestGetHandler(t *testing.T) {
 
 	// Проверка Get обработчика
 	req, err = http.NewRequest(http.MethodGet, "/"+id, nil)
+	req = req.WithContext(ctx)
 	require.NoErrorf(t, err, "Expected no error for GET request")
 
 	rr = httptest.NewRecorder()
@@ -126,12 +137,21 @@ func BenchmarkGetHandler(t *testing.B) {
 	server := s.NewServer()
 	handler := server.Handler
 
+	loggers, err := zap.NewDevelopment()
+	if err != nil {
+		panic(err)
+	}
+
+	sugar := *loggers.Sugar()
+	ctx := context.WithValue(context.Background(), loggerKey, sugar)
+
 	// Создание короткой ссылки (на случай, если тест запускается атомарно, без TestPostHandler)
 	requestBody := testURL
 	req, err := http.NewRequest(http.MethodPost, "/", bytes.NewBufferString(requestBody))
 	require.NoErrorf(t, err, "Expected no error for POST request")
 
 	rr := httptest.NewRecorder()
+	req = req.WithContext(ctx)
 	handler.PostHandler(rr, req)
 
 	shortURL := rr.Body.Bytes()
@@ -474,6 +494,14 @@ func BenchmarkPostHandlerMultiple(t *testing.B) {
 	server := s.NewServer()
 	handler := server.Handler
 
+	loggers, err := zap.NewDevelopment()
+	if err != nil {
+		panic(err)
+	}
+
+	sugar := *loggers.Sugar()
+	ctx := context.WithValue(context.Background(), loggerKey, sugar)
+
 	config.CreateStorageConfig()
 	requestBody := `[
     {
@@ -492,5 +520,6 @@ func BenchmarkPostHandlerMultiple(t *testing.B) {
 
 	rr := httptest.NewRecorder()
 	t.StartTimer() // Запускаем таймер после подготовки данных
+	req = req.WithContext(ctx)
 	handler.PostHandlerMultiple(rr, req)
 }
