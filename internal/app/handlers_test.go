@@ -26,6 +26,7 @@ func TestPostHandler(t *testing.T) {
 	server := s.NewServer()
 	handler := server.Handler
 
+	// Ранее не прокидывал логгер в хендлеры, поэтому в тестах пришлось тоже везде инициализировать логгер и передавать req с контекстом
 	loggers, err := zap.NewDevelopment()
 	if err != nil {
 		panic(err)

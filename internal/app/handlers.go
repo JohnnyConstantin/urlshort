@@ -178,6 +178,8 @@ func (h *Handler) PostHandler(w http.ResponseWriter, r *http.Request) {
 		err = json.NewEncoder(w).Encode(ShortURL)
 		if err != nil {
 			sugar.Errorf("Error in encoding response body: %v", err)
+			// Добавил логирование, сменил статус на InternalErrorCode, текст оставил дефолтным (он по тз).
+			// Также прокинул во все хендлеры логгер и логирую ошибки типа InternalError
 			http.Error(w, store.DefaultError, store.InternalSeverErrorCode)
 			return
 		}
