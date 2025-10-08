@@ -3,7 +3,9 @@ package app
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"encoding/json"
+	"go.uber.org/zap"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -24,6 +26,15 @@ func TestPostHandler(t *testing.T) {
 	server := s.NewServer()
 	handler := server.Handler
 
+	// Ранее не прокидывал логгер в хендлеры, поэтому в тестах пришлось тоже везде инициализировать логгер и передавать req с контекстом
+	loggers, err := zap.NewDevelopment()
+	if err != nil {
+		panic(err)
+	}
+
+	sugar := *loggers.Sugar()
+	ctx := context.WithValue(context.Background(), loggerKey, sugar)
+
 	config.CreateStorageConfig()
 	requestBody := "https://example.com"
 	req, err := http.NewRequest(http.MethodPost, "/", bytes.NewBufferString(requestBody))
@@ -32,6 +43,7 @@ func TestPostHandler(t *testing.T) {
 	}
 
 	rr := httptest.NewRecorder()
+	req = req.WithContext(ctx)
 	handler.PostHandler(rr, req)
 
 	// Проверка статуса (201)
@@ -52,6 +64,14 @@ func BenchmarkPostHandler(t *testing.B) {
 	server := s.NewServer()
 	handler := server.Handler
 
+	loggers, err := zap.NewDevelopment()
+	if err != nil {
+		panic(err)
+	}
+
+	sugar := *loggers.Sugar()
+	ctx := context.WithValue(context.Background(), loggerKey, sugar)
+
 	config.CreateStorageConfig()
 	requestBody := "https://example.com"
 	req, err := http.NewRequest(http.MethodPost, "/", bytes.NewBufferString(requestBody))
@@ -60,6 +80,8 @@ func BenchmarkPostHandler(t *testing.B) {
 	}
 
 	rr := httptest.NewRecorder()
+	req = req.WithContext(ctx)
+
 	t.StartTimer() // Запускаем таймер после подготовки данных
 	handler.PostHandler(rr, req)
 }
@@ -71,6 +93,13 @@ func TestGetHandler(t *testing.T) {
 	var s Server
 	server := s.NewServer()
 	handler := server.Handler
+	loggers, err := zap.NewDevelopment()
+	if err != nil {
+		panic(err)
+	}
+
+	sugar := *loggers.Sugar()
+	ctx := context.WithValue(context.Background(), loggerKey, sugar)
 
 	// Создание короткой ссылки (на случай, если тест запускается атомарно, без TestPostHandler)
 	requestBody := testURL
@@ -78,6 +107,7 @@ func TestGetHandler(t *testing.T) {
 	require.NoErrorf(t, err, "Expected no error for POST request")
 
 	rr := httptest.NewRecorder()
+	req = req.WithContext(ctx)
 	handler.PostHandler(rr, req)
 
 	shortURL := rr.Body.Bytes()
@@ -85,6 +115,7 @@ func TestGetHandler(t *testing.T) {
 
 	// Проверка Get обработчика
 	req, err = http.NewRequest(http.MethodGet, "/"+id, nil)
+	req = req.WithContext(ctx)
 	require.NoErrorf(t, err, "Expected no error for GET request")
 
 	rr = httptest.NewRecorder()
@@ -107,12 +138,21 @@ func BenchmarkGetHandler(t *testing.B) {
 	server := s.NewServer()
 	handler := server.Handler
 
+	loggers, err := zap.NewDevelopment()
+	if err != nil {
+		panic(err)
+	}
+
+	sugar := *loggers.Sugar()
+	ctx := context.WithValue(context.Background(), loggerKey, sugar)
+
 	// Создание короткой ссылки (на случай, если тест запускается атомарно, без TestPostHandler)
 	requestBody := testURL
 	req, err := http.NewRequest(http.MethodPost, "/", bytes.NewBufferString(requestBody))
 	require.NoErrorf(t, err, "Expected no error for POST request")
 
 	rr := httptest.NewRecorder()
+	req = req.WithContext(ctx)
 	handler.PostHandler(rr, req)
 
 	shortURL := rr.Body.Bytes()
@@ -133,12 +173,12 @@ func TestPostHandlerMultiple(t *testing.T) {
 	handler := server.Handler
 
 	tests := []struct {
+		setupContext   func(r *http.Request) *http.Request
 		name           string
 		requestBody    string
 		storageType    config.StorageType
 		expectedStatus int
 		wantError      bool
-		setupContext   func(r *http.Request) *http.Request
 	}{
 		{
 			name: "Successful batch request with memory storage",
@@ -191,12 +231,21 @@ func TestPostHandlerMultiple(t *testing.T) {
 			// Устанавливаем тип хранилища
 			config.CreateStorageConfig()
 
+			loggers, err := zap.NewDevelopment()
+			if err != nil {
+				panic(err)
+			}
+
+			sugar := *loggers.Sugar()
+			ctx := context.WithValue(context.Background(), loggerKey, sugar)
+
 			req, err := http.NewRequest(http.MethodPost, "/api/shorten/batch", bytes.NewBufferString(tt.requestBody))
 			if err != nil {
 				t.Fatal(err)
 			}
 
 			rr := httptest.NewRecorder()
+			req = req.WithContext(ctx)
 			handler.PostHandlerMultiple(rr, req)
 
 			// Проверка статуса
@@ -219,7 +268,10 @@ func TestPostHandlerMultiple(t *testing.T) {
 				// Для непустых запросов проверяем соответствие количества элементов
 				if tt.requestBody != "[]" {
 					var requests []models.BatchShortenRequest
-					json.Unmarshal([]byte(tt.requestBody), &requests)
+					err = json.Unmarshal([]byte(tt.requestBody), &requests)
+					if err != nil {
+						return
+					}
 					assert.Equal(t, len(requests), len(responses), "Number of responses should match requests")
 
 					// Проверяем, что correlation_id сохранились
@@ -257,7 +309,10 @@ func testHandler(w http.ResponseWriter, r *http.Request) {
 	body, _ := io.ReadAll(r.Body)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write(body) // Эхо-ответ с телом запроса
+	_, err := w.Write(body)
+	if err != nil {
+		return
+	} // Эхо-ответ с телом запроса
 }
 
 func TestGzipHandle(t *testing.T) {
@@ -400,7 +455,13 @@ func TestGzipHandle(t *testing.T) {
 					if err != nil {
 						t.Errorf("Response is not valid gzip: %v", err)
 					}
-					defer gr.Close()
+					defer func(gr *gzip.Reader) {
+						err = gr.Close()
+						if err != nil {
+							http.Error(rr, err.Error(), http.StatusInternalServerError)
+							return
+						}
+					}(gr)
 
 					uncompressed, err := io.ReadAll(gr)
 					if err != nil {
@@ -434,6 +495,14 @@ func BenchmarkPostHandlerMultiple(t *testing.B) {
 	server := s.NewServer()
 	handler := server.Handler
 
+	loggers, err := zap.NewDevelopment()
+	if err != nil {
+		panic(err)
+	}
+
+	sugar := *loggers.Sugar()
+	ctx := context.WithValue(context.Background(), loggerKey, sugar)
+
 	config.CreateStorageConfig()
 	requestBody := `[
     {
@@ -452,5 +521,6 @@ func BenchmarkPostHandlerMultiple(t *testing.B) {
 
 	rr := httptest.NewRecorder()
 	t.StartTimer() // Запускаем таймер после подготовки данных
+	req = req.WithContext(ctx)
 	handler.PostHandlerMultiple(rr, req)
 }

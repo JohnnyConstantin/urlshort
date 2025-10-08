@@ -4,6 +4,7 @@ package main
 import (
 	"database/sql"
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
@@ -19,7 +20,21 @@ import (
 
 var sugar zap.SugaredLogger
 
+// внутренние параметры для разработчика (предсказал их появление на первом же спринте xD). Перенес сюда из config.go
+//
+//nolint:gochecknoglobals
+var (
+	buildVersion = "N/A" // Версия билда
+	buildDate    = "N/A" // Дата билда
+	buildCommit  = "N/A" // Хеш коммита
+)
+
 func main() {
+
+	// Вывод информации о сборке. Перетащил сюда глобальные переменные, чтобы их не экспортировать из другого пакета,
+	// потому что изначально они находились пакете config
+	printBuildInfo()
+
 	var s app.Server
 	server := s.NewServer()
 
@@ -37,7 +52,12 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	defer logger.Sync()
+	defer func(logger *zap.Logger) {
+		err = logger.Sync()
+		if err != nil {
+			panic(err)
+		}
+	}(logger)
 
 	sugar = *logger.Sugar() // Создали экземпляр и в дальнейшем прокидываем его в middleware с логированием
 
@@ -55,12 +75,17 @@ func main() {
 	// Создание и применение конфигурации. Если ошибка - выход с ненулевым кодом. Ошибка при этом логируется в sugar
 	db, err := storageDecider()
 	if err != nil {
-		os.Exit(1)
+		panic(err)
 	}
 
 	//Если вернулся хендлер к БД (т.е. успешно создано соединение к БД), то закрываем после завершения программы
 	if db != nil {
-		defer db.Close()
+		defer func(db *sql.DB) {
+			err = db.Close()
+			if err != nil {
+				panic(err)
+			}
+		}(db)
 	}
 
 	// Вынес создание роутов в отдельную функцию
@@ -188,4 +213,10 @@ func storageDecider() (*sql.DB, error) {
 		sugar.Infow("Using memory storage (no persistence)")
 	}
 	return nil, nil
+}
+
+func printBuildInfo() {
+	fmt.Printf("Build version: %s\n", buildVersion)
+	fmt.Printf("Build date: %s\n", buildDate)
+	fmt.Printf("Build commit: %s\n", buildCommit)
 }

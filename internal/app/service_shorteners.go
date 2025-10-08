@@ -13,20 +13,20 @@ import (
 
 // DBShortener объект "сворачивания" URL c использованием БД
 type DBShortener struct {
-	cfg config.StorageConfig
 	db  *sql.DB
+	cfg config.StorageConfig
 }
 
 // FileShortener объект "сворачивания" URL c использованием файла
 type FileShortener struct {
-	cfg config.StorageConfig
 	mu  *sync.Mutex
+	cfg config.StorageConfig
 }
 
 // MemoryShortener объект "сворачивания" URL c использованием памяти
 type MemoryShortener struct {
-	cfg config.StorageConfig
 	mu  *sync.Mutex
+	cfg config.StorageConfig
 }
 
 // InitMutex создание мьютекса для сворачивания с файлом

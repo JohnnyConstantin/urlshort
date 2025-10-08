@@ -11,20 +11,20 @@ import (
 
 // DBFuller объект "разворачивания" URL c использованием БД
 type DBFuller struct {
-	cfg config.StorageConfig
 	db  *sql.DB
+	cfg config.StorageConfig
 }
 
 // FileFuller объект "разворачивания" URL c использованием файла
 type FileFuller struct {
-	cfg config.StorageConfig
 	mu  *sync.Mutex
+	cfg config.StorageConfig
 }
 
 // MemoryFuller объект "разворачивания" URL c использованием хранилища в памяти
 type MemoryFuller struct {
-	cfg config.StorageConfig
 	mu  *sync.Mutex
+	cfg config.StorageConfig
 }
 
 // InitMutex создание мьютекса для файлового разворачивателя

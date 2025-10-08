@@ -9,9 +9,15 @@ import (
 	"go.uber.org/zap"
 )
 
-type key string
+type (
+	key    string
+	logger string
+)
 
-const dbKey key = "database"
+const (
+	dbKey     key    = "database"
+	loggerKey logger = "sugar"
+)
 
 type (
 	// Берём структуру для хранения сведений об ответе
@@ -48,6 +54,7 @@ func WithLogging(db *sql.DB, h http.HandlerFunc, logger zap.SugaredLogger) http.
 		start := time.Now() // Засекаем
 
 		ctx := context.WithValue(r.Context(), dbKey, db)
+		ctx = context.WithValue(ctx, loggerKey, logger)
 
 		responseData := &responseData{
 			status: 0,
