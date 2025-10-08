@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"go.uber.org/zap"
 	"net/http"
 	"strings"
 	"time"
@@ -17,13 +18,19 @@ import (
 
 type myKeyType string
 
-const (
-	user myKeyType = "user"
-)
+const user myKeyType = "user"
 
 // WithAuth мидлварь, которая осуществляет аутентификацию к последующему хендлеру
 func (h *Handler) WithAuth(hf http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+
+		ctx := r.Context()
+
+		// Извлекаем логгер из контекста
+		sugar, ok := ctx.Value(loggerKey).(zap.SugaredLogger)
+		if !ok {
+			return
+		}
 
 		// Попытка аутентификации по куке
 		cookie, err := r.Cookie("auth_user")
@@ -67,8 +74,9 @@ func (h *Handler) WithAuth(hf http.HandlerFunc) http.HandlerFunc {
 				}
 			}
 
-			ctx := context.WithValue(r.Context(), user, userID)
 			// Прокидываем дальше
+			ctx = context.WithValue(r.Context(), user, userID)
+			ctx = context.WithValue(ctx, loggerKey, sugar)
 			hf(w, r.WithContext(ctx))
 
 		} else { // если куки нет, то авторизовать
@@ -77,8 +85,10 @@ func (h *Handler) WithAuth(hf http.HandlerFunc) http.HandlerFunc {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			ctx := context.WithValue(r.Context(), user, newUserID)
+
 			// Прокидываем дальше
+			ctx = context.WithValue(r.Context(), user, newUserID)
+			ctx = context.WithValue(ctx, loggerKey, sugar)
 			hf(w, r.WithContext(ctx))
 		}
 	}

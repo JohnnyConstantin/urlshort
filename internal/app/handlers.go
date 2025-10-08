@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"go.uber.org/zap"
 	"io"
 	"net/http"
 	_ "net/http/pprof"
@@ -43,6 +44,14 @@ func (h *Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
 	path := strings.Trim(r.URL.Path, "/")
 	parts := strings.Split(path, "/")
 
+	ctx := r.Context()
+
+	sugar, ok := ctx.Value(loggerKey).(zap.SugaredLogger)
+	if !ok {
+		http.Error(w, store.DefaultError, store.InternalSeverErrorCode)
+		return
+	}
+
 	if len(parts) != 1 {
 		http.Error(w, store.BadRequestError, store.DefaultErrorCode)
 		return
@@ -67,7 +76,9 @@ func (h *Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
 		// Если StorageDB, то в context не может быть nil (на это есть проверка в main), однако, на всякий случай здесь повторяем
 		db, ok := r.Context().Value(dbKey).(*sql.DB)
 		if !ok {
-			http.Error(w, "DB not in context", http.StatusInternalServerError)
+			sugar.Error("Error in getting database from context")
+			http.Error(w, store.DefaultError, store.InternalSeverErrorCode)
+			return
 		}
 
 		fuller := DBFuller{db, cfg}
@@ -76,6 +87,7 @@ func (h *Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
 			status = http.StatusGone
 		}
 	default:
+		sugar.Errorf("Unsupported storage type: %v", cfg.StorageType)
 		http.Error(w, store.DefaultError, store.DefaultErrorCode)
 		return
 	}
@@ -98,6 +110,14 @@ func (h *Handler) PostHandler(w http.ResponseWriter, r *http.Request) {
 	var OriginalURL models.ShortenRequest
 	var status int
 
+	ctx := r.Context()
+
+	sugar, ok := ctx.Value(loggerKey).(zap.SugaredLogger)
+	if !ok {
+		http.Error(w, store.DefaultError, store.InternalSeverErrorCode)
+		return
+	}
+
 	// Доп. обработка тела
 	// Ограничиваем размер тела запроса
 	maxSize := int64(1024 * 1024)
@@ -105,6 +125,7 @@ func (h *Handler) PostHandler(w http.ResponseWriter, r *http.Request) {
 
 	body, err := io.ReadAll(limitedReader)
 	if err != nil {
+		sugar.Errorf("Error in reading request body: %v", err)
 		http.Error(w, store.ReadBodyError, store.DefaultErrorCode)
 		return
 	}
@@ -140,12 +161,14 @@ func (h *Handler) PostHandler(w http.ResponseWriter, r *http.Request) {
 	case config.StorageDB:
 		db, userID, errs := initCtx(r)
 		if errs != nil {
-			http.Error(w, errs.Error(), store.InternalSeverErrorCode)
+			sugar.Errorf("Error in initialization of db and userID: %v", errs)
+			http.Error(w, store.DefaultError, store.InternalSeverErrorCode)
 			return
 		}
 		shortener := DBShortener{db, cfg}
 		ShortURL, status = shortener.ShortenURL(string(userID), OriginalURL.URL)
 	default:
+		sugar.Errorf("Unsupported storage type: %v", cfg.StorageType)
 		http.Error(w, store.DefaultError, store.DefaultErrorCode)
 		return
 	}
@@ -155,13 +178,15 @@ func (h *Handler) PostHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(status)
 		err = json.NewEncoder(w).Encode(ShortURL)
 		if err != nil {
-			http.Error(w, store.BadRequestError, store.InternalSeverErrorCode)
+			sugar.Errorf("Error in encoding response body: %v", err)
+			http.Error(w, store.DefaultError, store.InternalSeverErrorCode)
 			return
 		}
 	} else {
 		w.WriteHeader(status)
 		_, err := w.Write([]byte(ShortURL.Result))
 		if err != nil {
+			sugar.Errorf("Error in writing response body: %v", err)
 			http.Error(w, store.DefaultError, store.InternalSeverErrorCode)
 			return
 		}
@@ -173,6 +198,14 @@ func (h *Handler) PostHandlerMultiple(w http.ResponseWriter, r *http.Request) {
 	var requests []models.BatchShortenRequest
 	var ShortURL models.ShortenResponse
 	var status int
+
+	ctx := r.Context()
+
+	sugar, ok := ctx.Value(loggerKey).(zap.SugaredLogger)
+	if !ok {
+		http.Error(w, store.DefaultError, store.InternalSeverErrorCode)
+		return
+	}
 
 	// Доп. обработка тела
 	// Ограничиваем размер тела запроса
@@ -228,7 +261,8 @@ func (h *Handler) PostHandlerMultiple(w http.ResponseWriter, r *http.Request) {
 	case config.StorageDB:
 		db, userID, err := initCtx(r)
 		if err != nil {
-			http.Error(w, err.Error(), store.InternalSeverErrorCode)
+			sugar.Errorf("Error in initialization of db and userID: %v", err)
+			http.Error(w, store.DefaultError, store.InternalSeverErrorCode)
 			return
 		}
 		shortener := DBShortener{db, cfg}
@@ -241,12 +275,15 @@ func (h *Handler) PostHandlerMultiple(w http.ResponseWriter, r *http.Request) {
 			})
 		}
 	default: // Overkill, но перестраховаться нужно
+		sugar.Errorf("Unsupported storage type: %v", cfg.StorageType)
 		http.Error(w, store.DefaultError, store.DefaultErrorCode)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(responses); err != nil {
+		sugar.Errorf("Error in encoding response body: %v", err)
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 	}
 }
@@ -259,17 +296,27 @@ func (h *Handler) DeleteHandlerMultiple(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	ctx := r.Context()
+
+	sugar, ok := ctx.Value(loggerKey).(zap.SugaredLogger)
+	if !ok {
+		http.Error(w, store.DefaultError, store.InternalSeverErrorCode)
+		return
+	}
+
 	deleter := DBDeleter{cfg: config.GetStorageConfig(), db: db}
 
 	// Парсим тело запроса
 	var shortURLs []string
 	if err := json.NewDecoder(r.Body).Decode(&shortURLs); err != nil {
+		sugar.Errorf("Error in decoding request body: %v", err)
 		http.Error(w, "Invalid request body", http.StatusBadRequest)
 		return
 	}
 
 	if err := deleter.DeleteURL(userID, shortURLs); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		sugar.Errorf("Error in deleting URL: %v", err)
+		http.Error(w, store.DefaultError, http.StatusInternalServerError)
 	}
 
 	w.WriteHeader(http.StatusAccepted)
@@ -280,6 +327,14 @@ func (h *Handler) GetHandlerMultiple(w http.ResponseWriter, r *http.Request) {
 	db, userID, err := initCtx(r)
 	if err != nil {
 		http.Error(w, err.Error(), store.InternalSeverErrorCode)
+		return
+	}
+
+	ctx := r.Context()
+
+	sugar, ok := ctx.Value(loggerKey).(zap.SugaredLogger)
+	if !ok {
+		http.Error(w, store.DefaultError, store.InternalSeverErrorCode)
 		return
 	}
 
@@ -296,6 +351,7 @@ func (h *Handler) GetHandlerMultiple(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(urls); err != nil {
+		sugar.Errorf("Error in encoding response body: %v", err)
 		http.Error(w, "JSON encoding failed", http.StatusInternalServerError)
 		return
 	}

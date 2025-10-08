@@ -3,7 +3,8 @@ module github.com/JohnnyConstantin/urlshort
 go 1.23.4
 
 require (
-	github.com/go-chi/chi/v5 v5.2.1
+	github.com/JohnnyConstantin/go_mart v0.0.0-20250817152713-2f76577e5fc8
+	github.com/go-chi/chi/v5 v5.2.2
 	github.com/google/uuid v1.6.0
 	github.com/gordonklaus/ineffassign v0.2.0
 	github.com/jackc/pgx/v5 v5.7.5

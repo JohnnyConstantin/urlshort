@@ -67,8 +67,13 @@ func run(pass *analysis.Pass) (interface{}, error) {
 				return true
 			}
 
-			// Проверяем, что идентификатор селектора равен os.Exit
-			if pkgIdent.Name == "os" && selExpr.Sel.Name == "Exit" {
+			identObj, exists := pass.TypesInfo.Uses[pkgIdent]
+			if !exists {
+				return true
+			}
+
+			// Проверяем, что это пакет os и имя селектора Exit через поле Uses TypesInfo
+			if identObj.Name() == "os" && selExpr.Sel.Name == "Exit" {
 				pass.Reportf(callExpr.Pos(), "direct call to os.Exit in main function of main package is forbidden")
 			}
 
