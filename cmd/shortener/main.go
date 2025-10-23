@@ -3,16 +3,16 @@ package main
 
 import (
 	"database/sql"
+	"errors"
 	"flag"
 	"fmt"
+	route "github.com/go-chi/chi/v5"
+	"go.uber.org/zap"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"strings"
-
-	route "github.com/go-chi/chi/v5"
-	"go.uber.org/zap"
 
 	"github.com/JohnnyConstantin/urlshort/internal/app"
 	"github.com/JohnnyConstantin/urlshort/internal/config"
@@ -39,11 +39,6 @@ func main() {
 	var s app.Server
 	server := s.NewServer()
 
-	// Запускаем HTTP-сервер для профилирования в отдельной горутине
-	go func() {
-		log.Println(http.ListenAndServe("localhost:6060", nil))
-	}()
-
 	//Чтобы удобнее было работать
 	handler := server.Handler
 	router := route.NewRouter() //Используем внешний роутер chi, вместо встроенного в объект app.Server
@@ -54,10 +49,7 @@ func main() {
 		panic(err)
 	}
 	defer func(logger *zap.Logger) {
-		err = logger.Sync()
-		if err != nil {
-			panic(err)
-		}
+		logger.Sync()
 	}(logger)
 
 	sugar = *logger.Sugar() // Создали экземпляр и в дальнейшем прокидываем его в middleware с логированием
@@ -78,43 +70,56 @@ func main() {
 	)
 
 	// Создание и применение конфигурации. Если ошибка - выход с ненулевым кодом. Ошибка при этом логируется в sugar
-	db, err := storageDecider()
+	s.DB, err = storageDecider()
 	if err != nil {
 		panic(err)
 	}
 
-	//Если вернулся хендлер к БД (т.е. успешно создано соединение к БД), то закрываем после завершения программы
-	if db != nil {
-		defer func(db *sql.DB) {
-			err = db.Close()
-			if err != nil {
-				panic(err)
-			}
-		}(db)
-	}
+	// Запускаем HTTP-сервер для профилирования в отдельной горутине
+	go func() {
+		log.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
 
 	// Вынес создание роутов в отдельную функцию
-	createHandlers(db, router, sugar, handler)
+	createHandlers(s.DB, router, sugar, handler)
 
+	startListenAndServe(s, router)
+}
+
+func startListenAndServe(s app.Server, router *route.Mux) {
 	if config.Options.EnableHTTPS {
 		var cert, key = "cert.crt", "key.key" // Я бы сделал их также через опцию и env, но в задании об
 		// этом явно не сказано, поэтому выбрал захардкодить, чтобы четко соответствовать ТЗ
 		if !config.СertFilesExist(cert, key) { // Локально эти файлы есть, но в репу их не загружаю по понятным причинам
-			err = config.GenerateCertAndPrivFiles(cert, key)
+			err := config.GenerateCertAndPrivFiles(cert, key)
 			if err != nil {
 				sugar.Error("Failed to generate cert.crt/key.key") // Ошибка если не удалось создать пару
 				return
 			}
 		}
-		err = http.ListenAndServeTLS(config.Options.Address, cert, key, router)
+
+		go func() {
+			err := s.StartTLS(config.Options.Address, cert, key, router)
+			if err != nil && !errors.Is(err, http.ErrServerClosed) { // Т.к. под капотом возвращается err в любом случае,
+				// перехватываем только НЕ Shutdown\Close
+				return
+			}
+		}()
+
+		s.WaitForShutdown() // Ожидаем сигнала
+		sugar.Infow("Server gracefully shut down")
 	} else {
-		err = http.ListenAndServe(config.Options.Address, router)
-	}
+		go func() {
+			err := s.Start(config.Options.Address, router)
+			if err != nil && !errors.Is(err, http.ErrServerClosed) { // Т.к. под капотом возвращается err в любом случае,
+				// перехватываем только НЕ Shutdown\Close
+				return
+			}
+		}()
 
-	if err != nil {
-		return
+		s.WaitForShutdown() // Ожидаем сигнала
+		sugar.Infow("Server gracefully shut down")
 	}
-
 }
 
 func createHandlers(db *sql.DB, router *route.Mux, sugar zap.SugaredLogger, handler *app.Handler) {
