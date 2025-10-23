@@ -19,7 +19,12 @@ func SaveToFile(event models.URLRecord) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func(file *os.File) {
+		err = file.Close()
+		if err != nil {
+			return
+		}
+	}(file)
 
 	data, err := json.Marshal(&event)
 	if err != nil {
@@ -58,7 +63,12 @@ func LoadURLsFromFile(filename string, logger zap.SugaredLogger) error {
 		}
 		return err
 	}
-	defer file.Close()
+	defer func(file *os.File) {
+		err = file.Close()
+		if err != nil {
+			return
+		}
+	}(file)
 
 	decoder := json.NewDecoder(file)
 
