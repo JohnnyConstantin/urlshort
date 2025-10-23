@@ -64,6 +64,10 @@ func main() {
 
 	flag.Parse()
 
+	// Загружаем конфиг JSON. Логика перезаписывания с флагами инкапсулирована внутри. Переменные окружения и
+	// так грузятся после этого
+	config.LoadJSONConfig()
+
 	// Вынес загрузку переменных окружения в отдельную функцию
 	loadEnvs()
 
@@ -190,7 +194,6 @@ func loadEnvs() {
 		// окружения должна содержать true или 1 (перевожу в lowercase, чтобы обработать True и TRUE)
 		config.Options.EnableHTTPS = true
 	}
-
 }
 
 func storageDecider() (*sql.DB, error) {

@@ -7,6 +7,7 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/json"
 	"encoding/pem"
 	"flag"
 	"fmt"
@@ -40,7 +41,27 @@ var Options struct {
 	DSN         string
 	FileToWrite string
 	SecretKey   string
-	EnableHTTPS bool // Добавлена опция на HTTPS
+	EnableHTTPS bool   // Добавлена опция на HTTPS
+	Config      string // Добвалена опция для конфига
+}
+
+func DefaultConfig() *JSONConfig {
+	return &JSONConfig{
+		ServerAddress:   "localhost:8080",
+		BaseURL:         "http://localhost:8080",
+		FileStoragePath: "",
+		DatabaseDSN:     "",
+		EnableHTTPS:     false,
+	}
+}
+
+// JSONConfig JSON конфиг для опций
+type JSONConfig struct {
+	ServerAddress   string `json:"server_address"`
+	BaseURL         string `json:"base_url"`
+	FileStoragePath string `json:"file_storage_path"`
+	DatabaseDSN     string `json:"database_dsn"`
+	EnableHTTPS     bool   `json:"enable_https"`
 }
 
 // Config Объект глобального конфига
@@ -51,6 +72,83 @@ type StorageConfig struct {
 	StorageType StorageType
 	DatabaseDSN string // DSN для PostgreSQL (опциональное)
 	FilePath    string // Путь к файлу (опциональное)
+}
+
+// LoadConfigFromFile инициализирует JSON конфигурацию
+func LoadConfigFromFile(filename string) (*JSONConfig, error) {
+	config := DefaultConfig() // Сначала грузим дефолтные значения, а затем меняем их на те, что в файле на случай,
+	// если каких-то значений в файле не будет
+
+	data, err := os.ReadFile(filename)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read config file: %v", err)
+	}
+
+	if err := json.Unmarshal(data, config); err != nil {
+		return nil, fmt.Errorf("cannot parse config file: %v", err)
+	}
+
+	return config, nil
+}
+
+// LoadJSONConfig загружает конфигурацию из JSON файла
+func LoadJSONConfig() {
+	configFilePath := getConfigFilePath()
+	if configFilePath == "" {
+		return // Файл конфигурации не указан
+	}
+
+	jsonConfig, err := LoadConfigFromFile(configFilePath)
+	if err != nil {
+		return
+	}
+
+	// Применяем JSON конфиг с учетом того, что флаги имеют приоритет выше, чем конфига
+	ApplyJSONConfig(jsonConfig, flag.Parsed())
+}
+
+// ApplyJSONConfig применяет значения из JSON конфига к глобальным Options
+// с учетом того, что флаги и env имеют высший приоритет
+func ApplyJSONConfig(jsonConfig *JSONConfig, flagsParsed bool) {
+	// Применяем значения только если они не были установлены флагами (env потом сам перезапишет значения в main)
+	addressSet := isFlagSet("a")
+	baseAddressSet := isFlagSet("b")
+	fileToWriteSet := isFlagSet("f")
+	dsnSet := isFlagSet("d")
+	enableHTTPSSet := isFlagSet("s")
+
+	// Применяем JSON конфиг только если флаг НЕ был установлен явно
+	if !addressSet {
+		Options.Address = jsonConfig.ServerAddress
+	}
+	if !baseAddressSet {
+		Options.BaseAddress = jsonConfig.BaseURL
+	}
+	if !fileToWriteSet {
+		Options.FileToWrite = jsonConfig.FileStoragePath
+	}
+	if !dsnSet {
+		Options.DSN = jsonConfig.DatabaseDSN
+	}
+	if !enableHTTPSSet {
+		Options.EnableHTTPS = jsonConfig.EnableHTTPS
+	}
+}
+
+// getConfigFilePath возвращает путь к файлу конфигурации с учетом приоритетов
+func getConfigFilePath() string {
+	// Сначала проверяем флаги, поскольку они уже загружены
+	if Options.Config != "" {
+		return Options.Config
+	}
+
+	// Затем переменную окружения, проверяем ее заранее, перед функцией loadEnv в main
+	envG, ok := os.LookupEnv("CONFIG")
+	if ok && envG != "" {
+		return envG
+	}
+
+	return ""
 }
 
 func init() {
@@ -88,6 +186,29 @@ func init() {
 		false, // По умолчанию используем HTTP
 		"Enable HTTPS server",
 	)
+	flag.StringVar( // Ключ для конфига (config)
+		&Options.Config,
+		"config",
+		"",
+		"Use JSON as configurator",
+	)
+	flag.StringVar( // Ключ для конфига (c)
+		&Options.Config,
+		"c",
+		"",
+		"Use JSON as configurator",
+	)
+}
+
+// isFlagSet проверяет, был ли установлен флаг с указанным именем
+func isFlagSet(name string) bool {
+	isSet := false
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == name {
+			isSet = true
+		}
+	})
+	return isSet
 }
 
 // CreateStorageConfig В зависимости от переданых параметров устанавливает StorageType для всего приложения
