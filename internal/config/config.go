@@ -85,7 +85,7 @@ func init() {
 	flag.BoolVar( // Ключ для HTTPS
 		&Options.EnableHTTPS,
 		"s",
-		true,
+		false, // По умолчанию используем HTTP
 		"Enable HTTPS server",
 	)
 }

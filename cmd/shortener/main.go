@@ -92,7 +92,7 @@ func main() {
 	// Вынес создание роутов в отдельную функцию
 	createHandlers(db, router, sugar, handler)
 
-	if config.Options.EnableHTTPS == true {
+	if config.Options.EnableHTTPS {
 		var cert, key = "cert.crt", "key.key" // Я бы сделал их также через опцию и env, но в задании об
 		// этом явно не сказано, поэтому выбрал захардкодить, чтобы четко соответствовать ТЗ
 		if !config.СertFilesExist(cert, key) { // Локально эти файлы есть, но в репу их не загружаю по понятным причинам
