@@ -9,6 +9,7 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+	"strings"
 
 	route "github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
@@ -91,10 +92,25 @@ func main() {
 	// Вынес создание роутов в отдельную функцию
 	createHandlers(db, router, sugar, handler)
 
-	err = http.ListenAndServe(config.Options.Address, router)
+	if config.Options.EnableHTTPS == true {
+		var cert, key = "cert.crt", "key.key" // Я бы сделал их также через опцию и env, но в задании об
+		// этом явно не сказано, поэтому выбрал захардкодить, чтобы четко соответствовать ТЗ
+		if !config.СertFilesExist(cert, key) { // Локально эти файлы есть, но в репу их не загружаю по понятным причинам
+			err = config.GenerateCertAndPrivFiles(cert, key)
+			if err != nil {
+				sugar.Error("Failed to generate cert.crt/key.key") // Ошибка если не удалось создать пару
+				return
+			}
+		}
+		err = http.ListenAndServeTLS(config.Options.Address, cert, key, router)
+	} else {
+		err = http.ListenAndServe(config.Options.Address, router)
+	}
+
 	if err != nil {
 		return
 	}
+
 }
 
 func createHandlers(db *sql.DB, router *route.Mux, sugar zap.SugaredLogger, handler *app.Handler) {
@@ -167,6 +183,12 @@ func loadEnvs() {
 	envE, ok := os.LookupEnv("SECRET_KEY")
 	if ok && envE != "" {
 		config.Options.SecretKey = envE
+	}
+
+	envF, ok := os.LookupEnv("ENABLE_HTTPS")
+	if ok && (strings.ToLower(envF) == "true" || strings.ToLower(envF) == "1") { // Предполагаю, что переменная
+		// окружения должна содержать true или 1 (перевожу в lowercase, чтобы обработать True и TRUE)
+		config.Options.EnableHTTPS = true
 	}
 
 }

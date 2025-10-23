@@ -14,6 +14,11 @@
 # Binaries
 cmd/shortener/main
 cmd/shortener/shortener
+
+# Privates
+cmd/shortener/cert.crt
+cmd/shortener/key.key
+
 # Добавил бинарник в игнор, совсем забыл про него
 cmd/staticlint/staticlint
 
