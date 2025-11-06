@@ -3,17 +3,19 @@ package main
 
 import (
 	"database/sql"
+	"errors"
 	"flag"
 	"fmt"
+	route "github.com/go-chi/chi/v5"
+	"go.uber.org/zap"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
-
-	route "github.com/go-chi/chi/v5"
-	"go.uber.org/zap"
+	"strings"
 
 	"github.com/JohnnyConstantin/urlshort/internal/app"
+	"github.com/JohnnyConstantin/urlshort/internal/certificates"
 	"github.com/JohnnyConstantin/urlshort/internal/config"
 	"github.com/JohnnyConstantin/urlshort/internal/store"
 )
@@ -38,11 +40,6 @@ func main() {
 	var s app.Server
 	server := s.NewServer()
 
-	// Запускаем HTTP-сервер для профилирования в отдельной горутине
-	go func() {
-		log.Println(http.ListenAndServe("localhost:6060", nil))
-	}()
-
 	//Чтобы удобнее было работать
 	handler := server.Handler
 	router := route.NewRouter() //Используем внешний роутер chi, вместо встроенного в объект app.Server
@@ -53,15 +50,16 @@ func main() {
 		panic(err)
 	}
 	defer func(logger *zap.Logger) {
-		err = logger.Sync()
-		if err != nil {
-			panic(err)
-		}
+		logger.Sync()
 	}(logger)
 
 	sugar = *logger.Sugar() // Создали экземпляр и в дальнейшем прокидываем его в middleware с логированием
 
 	flag.Parse()
+
+	// Загружаем конфиг JSON. Логика перезаписывания с флагами инкапсулирована внутри. Переменные окружения и
+	// так грузятся после этого
+	config.LoadJSONConfig()
 
 	// Вынес загрузку переменных окружения в отдельную функцию
 	loadEnvs()
@@ -73,27 +71,87 @@ func main() {
 	)
 
 	// Создание и применение конфигурации. Если ошибка - выход с ненулевым кодом. Ошибка при этом логируется в sugar
-	db, err := storageDecider()
+	s.DB, err = storageDecider()
 	if err != nil {
 		panic(err)
 	}
 
-	//Если вернулся хендлер к БД (т.е. успешно создано соединение к БД), то закрываем после завершения программы
-	if db != nil {
-		defer func(db *sql.DB) {
-			err = db.Close()
-			if err != nil {
-				panic(err)
-			}
-		}(db)
-	}
+	// Запускаем HTTP-сервер для профилирования в отдельной горутине
+	go func() {
+		log.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
 
 	// Вынес создание роутов в отдельную функцию
-	createHandlers(db, router, sugar, handler)
+	createHandlers(s.DB, router, sugar, handler)
 
-	err = http.ListenAndServe(config.Options.Address, router)
-	if err != nil {
-		return
+	startListenAndServe(s, router)
+}
+
+func startListenAndServe(s app.Server, router *route.Mux) {
+
+	errChan := make(chan error, 1)         // Канал для ошибок. В данном контексте неважно из какой горутины прилетело - обработка идентичная для всех.
+	shutdownChan := make(chan struct{}, 1) // Канал для graceful shutdown успешных сообщений
+
+	if config.Options.EnableHTTPS {
+		var cert, key = "cert.crt", "key.key" // Я бы сделал их также через опцию и env, но в задании об
+		// этом явно не сказано, поэтому выбрал захардкодить, чтобы четко соответствовать ТЗ
+		if !certificates.СertFilesExist(cert, key) { // Локально эти файлы есть, но в репу их не загружаю по понятным причинам
+			err := certificates.GenerateCertAndPrivFiles(cert, key)
+			if err != nil {
+				sugar.Error("Failed to generate cert.crt/key.key") // Ошибка если не удалось создать пару
+				return
+			}
+		}
+
+		go func() {
+			err := s.StartTLS(config.Options.Address, cert, key, router)
+			if err != nil && !errors.Is(err, http.ErrServerClosed) { // Т.к. под капотом возвращается err в любом случае,
+				// перехватываем только НЕ Shutdown\Close
+				errChan <- err // Пробрасываем ошибку в канал
+				return
+			}
+			errChan <- nil // Корректно завершились
+		}()
+
+		waitShutdown(errChan, shutdownChan, sugar, &s)
+
+	} else {
+		go func() {
+			err := s.Start(config.Options.Address, router)
+			if err != nil && !errors.Is(err, http.ErrServerClosed) { // Т.к. под капотом возвращается err в любом случае,
+				// перехватываем только НЕ Shutdown\Close
+				errChan <- err // Пробрасываем ошибку в канал
+				return
+			}
+			errChan <- nil // Корректно завершились
+		}()
+
+		waitShutdown(errChan, shutdownChan, sugar, &s)
+	}
+}
+
+// Функция ожидания сигнала завершения и обработки ошибок
+func waitShutdown(errChan chan error, shutdownChan chan struct{}, sugar zap.SugaredLogger, s *app.Server) {
+
+	go func() {
+		err := s.WaitForShutdown(sugar) // Ожидаем сигнала
+		if err != nil {
+			sugar.Error("Failed while shutting down: ", err)
+			errChan <- err
+		}
+		shutdownChan <- struct{}{} // Отправляем сигнал об успешном завершении
+	}()
+
+	// Ловим сигналы ошибок/успешного завершения
+	select {
+	case err := <-errChan: // Пришла ошибка
+		if err != nil {
+			sugar.Error("Received error while shutting down server", err)
+			return
+		}
+		sugar.Info("Server gracefully shut down")
+	case <-shutdownChan: // Пришел сигнал успешного завершения
+		sugar.Info("Server gracefully shut down")
 	}
 }
 
@@ -169,6 +227,11 @@ func loadEnvs() {
 		config.Options.SecretKey = envE
 	}
 
+	envF, ok := os.LookupEnv("ENABLE_HTTPS")
+	if ok && (strings.ToLower(envF) == "true" || strings.ToLower(envF) == "1") { // Предполагаю, что переменная
+		// окружения должна содержать true или 1 (перевожу в lowercase, чтобы обработать True и TRUE)
+		config.Options.EnableHTTPS = true
+	}
 }
 
 func storageDecider() (*sql.DB, error) {
