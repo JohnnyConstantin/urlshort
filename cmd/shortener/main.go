@@ -153,8 +153,6 @@ func waitShutdown(errChan chan error, shutdownChan chan struct{}, sugar zap.Suga
 	case <-shutdownChan: // Пришел сигнал успешного завершения
 		sugar.Info("Server gracefully shut down")
 	}
-
-	return
 }
 
 func createHandlers(db *sql.DB, router *route.Mux, sugar zap.SugaredLogger, handler *app.Handler) {
