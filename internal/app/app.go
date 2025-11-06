@@ -5,7 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"github.com/go-chi/chi/v5"
-	"log"
+	"go.uber.org/zap"
 	"net/http"
 	"os"
 	"os/signal"
@@ -52,7 +52,7 @@ func (s *Server) StartTLS(addr, certFile, keyFile string, router *chi.Mux) error
 }
 
 // WaitForShutdown ожидает сигналов завершения работы
-func (s *Server) WaitForShutdown() {
+func (s *Server) WaitForShutdown(logger zap.SugaredLogger) error {
 	// Канал для получения сигналов ОС
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
@@ -60,14 +60,18 @@ func (s *Server) WaitForShutdown() {
 	// Блокируемся до получения сигнала
 	<-sigChan
 
+	logger.Info("Received shutdown signal...")
+
 	// Инициируем graceful shutdown
-	s.Shutdown()
+	err := s.Shutdown()
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
-func (s *Server) Shutdown() {
-	if s.HTTPServer == nil { // На всякий случай
-		return
-	}
+func (s *Server) Shutdown() error {
 
 	// Создаем контекст с таймаутом для graceful shutdown
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -75,13 +79,15 @@ func (s *Server) Shutdown() {
 
 	// Останавливаем HTTP сервер
 	if err := s.HTTPServer.Shutdown(ctx); err != nil {
-		log.Printf("HTTP server shutdown error: %v", err)
+		return err
 	}
 
 	// Закрываем соединение с базой данных. Close самостоятельно дожидается окончания всех начатых операций с БД
 	if s.DB != nil {
 		if err := s.DB.Close(); err != nil {
-			log.Printf("Database connection close error: %v", err)
+			return err
 		}
 	}
+
+	return nil
 }

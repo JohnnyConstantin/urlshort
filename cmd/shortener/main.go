@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/JohnnyConstantin/urlshort/internal/app"
+	"github.com/JohnnyConstantin/urlshort/internal/certificates"
 	"github.com/JohnnyConstantin/urlshort/internal/config"
 	"github.com/JohnnyConstantin/urlshort/internal/store"
 )
@@ -87,11 +88,15 @@ func main() {
 }
 
 func startListenAndServe(s app.Server, router *route.Mux) {
+
+	errChan := make(chan error, 1)         // Канал для ошибок. В данном контексте неважно из какой горутины прилетело - обработка идентичная для всех.
+	shutdownChan := make(chan struct{}, 1) // Канал для graceful shutdown успешных сообщений
+
 	if config.Options.EnableHTTPS {
 		var cert, key = "cert.crt", "key.key" // Я бы сделал их также через опцию и env, но в задании об
 		// этом явно не сказано, поэтому выбрал захардкодить, чтобы четко соответствовать ТЗ
-		if !config.СertFilesExist(cert, key) { // Локально эти файлы есть, но в репу их не загружаю по понятным причинам
-			err := config.GenerateCertAndPrivFiles(cert, key)
+		if !certificates.СertFilesExist(cert, key) { // Локально эти файлы есть, но в репу их не загружаю по понятным причинам
+			err := certificates.GenerateCertAndPrivFiles(cert, key)
 			if err != nil {
 				sugar.Error("Failed to generate cert.crt/key.key") // Ошибка если не удалось создать пару
 				return
@@ -102,24 +107,54 @@ func startListenAndServe(s app.Server, router *route.Mux) {
 			err := s.StartTLS(config.Options.Address, cert, key, router)
 			if err != nil && !errors.Is(err, http.ErrServerClosed) { // Т.к. под капотом возвращается err в любом случае,
 				// перехватываем только НЕ Shutdown\Close
+				errChan <- err // Пробрасываем ошибку в канал
 				return
 			}
+			errChan <- nil // Корректно завершились
 		}()
 
-		s.WaitForShutdown() // Ожидаем сигнала
-		sugar.Infow("Server gracefully shut down")
+		waitShutdown(errChan, shutdownChan, sugar, &s)
+
 	} else {
 		go func() {
 			err := s.Start(config.Options.Address, router)
 			if err != nil && !errors.Is(err, http.ErrServerClosed) { // Т.к. под капотом возвращается err в любом случае,
 				// перехватываем только НЕ Shutdown\Close
+				errChan <- err // Пробрасываем ошибку в канал
 				return
 			}
+			errChan <- nil // Корректно завершились
 		}()
 
-		s.WaitForShutdown() // Ожидаем сигнала
-		sugar.Infow("Server gracefully shut down")
+		waitShutdown(errChan, shutdownChan, sugar, &s)
 	}
+}
+
+// Функция ожидания сигнала завершения и обработки ошибок
+func waitShutdown(errChan chan error, shutdownChan chan struct{}, sugar zap.SugaredLogger, s *app.Server) {
+
+	go func() {
+		err := s.WaitForShutdown(sugar) // Ожидаем сигнала
+		if err != nil {
+			sugar.Error("Failed while shutting down: ", err)
+			errChan <- err
+		}
+		shutdownChan <- struct{}{} // Отправляем сигнал об успешном завершении
+	}()
+
+	// Ловим сигналы ошибок/успешного завершения
+	select {
+	case err := <-errChan: // Пришла ошибка
+		if err != nil {
+			sugar.Error("Received error while shutting down server", err)
+			return
+		}
+		sugar.Info("Server gracefully shut down")
+	case <-shutdownChan: // Пришел сигнал успешного завершения
+		sugar.Info("Server gracefully shut down")
+	}
+
+	return
 }
 
 func createHandlers(db *sql.DB, router *route.Mux, sugar zap.SugaredLogger, handler *app.Handler) {
