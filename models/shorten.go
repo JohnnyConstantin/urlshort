@@ -26,6 +26,12 @@ type URLResponse struct {
 	OriginalURL string `json:"original_url"`
 }
 
+// Statistics Объект, содержащий статистические данные сервиса
+type Statistics struct {
+	URLCount   int `json:"urls"`
+	UsersCount int `json:"users"`
+}
+
 // BatchShortenRequest В дальнейшем возможно будет использован для группировки полных URL под одним ID
 // Пока что бесполезен
 type BatchShortenRequest struct {

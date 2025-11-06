@@ -360,6 +360,65 @@ func (h *Handler) GetHandlerMultiple(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }
 
+func (h *Handler) GetHandlerStats(w http.ResponseWriter, r *http.Request) {
+	var stats models.Statistics
+	var statistics Statter
+
+	ctx := r.Context()
+
+	// Извлекаем логгер из контекста
+	sugar, ok := ctx.Value(loggerKey).(zap.SugaredLogger)
+	if !ok {
+		return
+	}
+
+	// Извлекаем бд из контекста
+	db, ok := r.Context().Value(dbKey).(*sql.DB)
+	if !ok {
+		sugar.Errorf("Error in getting DB connection from context")
+		return
+	}
+
+	cfg := config.GetStorageConfig()
+
+	switch cfg.StorageType {
+	case config.StorageFile:
+		statistics = NewFileStatistics(cfg)
+
+	case config.StorageMemory:
+		statistics = NewMemoryStatistics(cfg)
+
+	case config.StorageDB:
+		statistics = NewDBStatistics(db, cfg)
+
+	default: // Overkill, но перестраховаться нужно
+		sugar.Errorf("Unsupported storage type: %v", cfg.StorageType)
+		http.Error(w, store.DefaultError, store.DefaultErrorCode)
+		return
+	}
+
+	cnt, err := statistics.GetURLsCount()
+	if err != nil {
+		return
+	}
+	usrs, err := statistics.GetUsersCount()
+	if err != nil {
+		return
+	}
+
+	stats.UsersCount = usrs
+	stats.URLCount = cnt
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(stats); err != nil {
+		sugar.Errorf("Error in encoding response body: %v", err)
+		http.Error(w, "JSON encoding failed", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
 // GzipHandle мидлварь для работы со сжатием
 func GzipHandle(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

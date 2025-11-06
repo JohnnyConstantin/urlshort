@@ -87,8 +87,8 @@ func GenerateCertAndPrivFiles(certFile, keyFile string) error {
 	return nil
 }
 
-// СertFilesExist проверяет существование файлов сертификата и ключа
-func СertFilesExist(certFile, keyFile string) bool {
+// CertFilesExist проверяет существование файлов сертификата и ключа
+func CertFileExist(certFile, keyFile string) bool {
 	if _, err := os.Stat(certFile); os.IsNotExist(err) {
 		return false
 	}
