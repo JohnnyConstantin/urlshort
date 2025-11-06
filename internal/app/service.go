@@ -10,3 +10,9 @@ type Shortener interface {
 	GetFullURL(shortID string) (models.ShortenRequest, bool) // Используется для получения полного URL, используя короткий
 	DeleteURL(userID string) error
 }
+
+// Statter интерфейс для разных функций cтатистики в зависимости от используемого StorageType
+type Statter interface {
+	GetUsersCount() (int, error) // Получить количество пользователей
+	GetURLsCount() (int, error)  // Получить количество URL
+}

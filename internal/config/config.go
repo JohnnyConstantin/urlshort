@@ -29,13 +29,14 @@ var (
 
 // Options опции запуска сервера
 var Options struct {
-	Address     string
-	BaseAddress string
-	DSN         string
-	FileToWrite string
-	SecretKey   string
-	Config      string // Добвалена опция для конфига
-	EnableHTTPS bool   // Добавлена опция на HTTPS
+	Address       string
+	BaseAddress   string
+	DSN           string
+	FileToWrite   string
+	SecretKey     string
+	Config        string // Добвалена опция для конфига
+	EnableHTTPS   bool   // Добавлена опция на HTTPS
+	TrustedSubnet string
 }
 
 func DefaultConfig() *JSONConfig {
@@ -54,6 +55,7 @@ type JSONConfig struct {
 	BaseURL         string `json:"base_url"`
 	FileStoragePath string `json:"file_storage_path"`
 	DatabaseDSN     string `json:"database_dsn"`
+	TrustedSubnet   string `json:"trusted_subnet"`
 	EnableHTTPS     bool   `json:"enable_https"`
 }
 
@@ -190,6 +192,12 @@ func init() {
 		"c",
 		"",
 		"Use JSON as configurator",
+	)
+	flag.StringVar(
+		&Options.TrustedSubnet,
+		"t",
+		"",
+		"Provide trusted subnet to get statistics",
 	)
 }
 

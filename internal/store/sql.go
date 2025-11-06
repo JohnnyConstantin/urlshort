@@ -181,3 +181,24 @@ func DeleteURLs(db *sql.DB, userID string, batch []string) error {
 
 	return nil
 }
+
+func GetUsersCount(db *sql.DB) (int, error) {
+
+	var count int
+
+	err := db.QueryRow("SELECT COUNT(DISTINCT uuid) FROM urls").Scan(&count)
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func GetURLsCount(db *sql.DB) (int, error) {
+	var count int
+	err := db.QueryRow("SELECT COUNT(*) FROM urls WHERE is_deleted = false").Scan(&count)
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
+}
