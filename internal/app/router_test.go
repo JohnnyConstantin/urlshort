@@ -13,7 +13,8 @@ import (
 // TestRouterServeHTTP проверяет обработку запросов роутером
 func TestRouterServeHTTP(t *testing.T) {
 	var s Server
-	server := s.NewServer()
+	service := Service{}
+	server := s.NewServer(&service)
 	router := server.Router
 
 	testHandler := func(w http.ResponseWriter, r *http.Request) {
@@ -52,7 +53,8 @@ func TestRouterServeHTTP(t *testing.T) {
 // TestRouterAddRoute проверяет добавление маршрутов в роутер
 func TestRouterAddRoute(t *testing.T) {
 	var s Server
-	server := s.NewServer()
+	service := Service{}
+	server := s.NewServer(&service)
 	router := server.Router
 
 	// Добавляем тестовый маршрут

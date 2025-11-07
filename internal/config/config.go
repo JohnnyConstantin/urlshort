@@ -29,13 +29,15 @@ var (
 
 // Options опции запуска сервера
 var Options struct {
-	Address     string
-	BaseAddress string
-	DSN         string
-	FileToWrite string
-	SecretKey   string
-	Config      string // Добвалена опция для конфига
-	EnableHTTPS bool   // Добавлена опция на HTTPS
+	Address       string
+	BaseAddress   string
+	DSN           string
+	FileToWrite   string
+	SecretKey     string
+	GRPCBaseAddr  string
+	Config        string // Добвалена опция для конфига
+	EnableHTTPS   bool   // Добавлена опция на HTTPS
+	TrustedSubnet string
 }
 
 func DefaultConfig() *JSONConfig {
@@ -54,7 +56,9 @@ type JSONConfig struct {
 	BaseURL         string `json:"base_url"`
 	FileStoragePath string `json:"file_storage_path"`
 	DatabaseDSN     string `json:"database_dsn"`
+	TrustedSubnet   string `json:"trusted_subnet"`
 	EnableHTTPS     bool   `json:"enable_https"`
+	GRPCBaseAddr    string `json:"grpc_addr"`
 }
 
 // Config Объект глобального конфига
@@ -109,6 +113,8 @@ func ApplyJSONConfig(jsonConfig *JSONConfig, flagsParsed bool) {
 	fileToWriteSet := isFlagSet("f")
 	dsnSet := isFlagSet("d")
 	enableHTTPSSet := isFlagSet("s")
+	trustedSubnetSet := isFlagSet("t")
+	grpcAddrSet := isFlagSet("r")
 
 	// Применяем JSON конфиг только если флаг НЕ был установлен явно
 	if !addressSet {
@@ -125,6 +131,12 @@ func ApplyJSONConfig(jsonConfig *JSONConfig, flagsParsed bool) {
 	}
 	if !enableHTTPSSet {
 		Options.EnableHTTPS = jsonConfig.EnableHTTPS
+	}
+	if !trustedSubnetSet {
+		Options.TrustedSubnet = jsonConfig.TrustedSubnet
+	}
+	if !grpcAddrSet {
+		Options.GRPCBaseAddr = jsonConfig.GRPCBaseAddr
 	}
 }
 
@@ -190,6 +202,18 @@ func init() {
 		"c",
 		"",
 		"Use JSON as configurator",
+	)
+	flag.StringVar(
+		&Options.TrustedSubnet,
+		"t",
+		"",
+		"Provide trusted subnet to get statistics",
+	)
+	flag.StringVar( // Ключ для gRPC
+		&Options.GRPCBaseAddr,
+		"r",
+		"127.0.0.1:8085",
+		"gRPC base address",
 	)
 }
 

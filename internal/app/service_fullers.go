@@ -11,20 +11,20 @@ import (
 
 // DBFuller объект "разворачивания" URL c использованием БД
 type DBFuller struct {
-	db  *sql.DB
-	cfg config.StorageConfig
+	DB  *sql.DB
+	Cfg config.StorageConfig
 }
 
 // FileFuller объект "разворачивания" URL c использованием файла
 type FileFuller struct {
 	mu  *sync.Mutex
-	cfg config.StorageConfig
+	Cfg config.StorageConfig
 }
 
 // MemoryFuller объект "разворачивания" URL c использованием хранилища в памяти
 type MemoryFuller struct {
 	mu  *sync.Mutex
-	cfg config.StorageConfig
+	Cfg config.StorageConfig
 }
 
 // InitMutex создание мьютекса для файлового разворачивателя
@@ -37,24 +37,28 @@ func (f *MemoryFuller) InitMutex() {
 	f.mu = new(sync.Mutex)
 }
 
+// InitMutex mock для БД
+func (f *DBFuller) InitMutex() {
+}
+
 // GetFullURL получить из БД полную URL по сокращенному
-func (f *DBFuller) GetFullURL(shortID string) (models.ShortenRequest, bool, bool) {
+func (f *DBFuller) GetFullURL(shortID string) (models.ShortenRequest, bool, bool, error) {
 	result := models.ShortenRequest{URL: ""}
 
-	originalURL, exists, isDeleted, err := store.Read(f.db, shortID)
+	originalURL, exists, isDeleted, err := store.Read(f.DB, shortID)
 	if err != nil {
-		return result, false, false
+		return result, false, false, err
 	}
 	if exists {
 		result.URL = originalURL
-		return result, exists, isDeleted
+		return result, exists, isDeleted, nil
 	}
 
-	return result, false, false
+	return result, exists, isDeleted, nil
 }
 
 // GetFullURL Получить из файла полную URL по сокращенной
-func (f *FileFuller) GetFullURL(shortID string) (models.ShortenRequest, bool) {
+func (f *FileFuller) GetFullURL(shortID string) (models.ShortenRequest, bool, bool, error) {
 	result := models.ShortenRequest{URL: ""}
 
 	f.mu.Lock()
@@ -62,13 +66,13 @@ func (f *FileFuller) GetFullURL(shortID string) (models.ShortenRequest, bool) {
 	originalURL, exists := store.URLStore[shortID]
 	if exists {
 		result.URL = originalURL
-		return result, exists
+		return result, exists, false, nil
 	}
-	return result, exists
+	return result, exists, false, nil
 }
 
 // GetFullURL Получить из памяти полную URL по сокращенной
-func (f *MemoryFuller) GetFullURL(shortID string) (models.ShortenRequest, bool) {
+func (f *MemoryFuller) GetFullURL(shortID string) (models.ShortenRequest, bool, bool, error) {
 	result := models.ShortenRequest{URL: ""}
 
 	f.mu.Lock()
@@ -76,7 +80,7 @@ func (f *MemoryFuller) GetFullURL(shortID string) (models.ShortenRequest, bool) 
 	originalURL, exists := store.URLStore[shortID]
 	if exists {
 		result.URL = originalURL
-		return result, exists
+		return result, exists, false, nil
 	}
-	return result, exists
+	return result, exists, false, nil
 }

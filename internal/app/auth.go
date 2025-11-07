@@ -18,7 +18,7 @@ import (
 
 type myKeyType string
 
-const user myKeyType = "user"
+const User myKeyType = "user"
 
 // WithAuth мидлварь, которая осуществляет аутентификацию к последующему хендлеру
 func (h *Handler) WithAuth(hf http.HandlerFunc) http.HandlerFunc {
@@ -75,7 +75,7 @@ func (h *Handler) WithAuth(hf http.HandlerFunc) http.HandlerFunc {
 			}
 
 			// Прокидываем дальше
-			ctx = context.WithValue(r.Context(), user, userID)
+			ctx = context.WithValue(r.Context(), User, userID)
 			ctx = context.WithValue(ctx, loggerKey, sugar)
 			hf(w, r.WithContext(ctx))
 
@@ -87,7 +87,7 @@ func (h *Handler) WithAuth(hf http.HandlerFunc) http.HandlerFunc {
 			}
 
 			// Прокидываем дальше
-			ctx = context.WithValue(r.Context(), user, newUserID)
+			ctx = context.WithValue(r.Context(), User, newUserID)
 			ctx = context.WithValue(ctx, loggerKey, sugar)
 			hf(w, r.WithContext(ctx))
 		}

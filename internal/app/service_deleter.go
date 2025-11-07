@@ -10,8 +10,8 @@ import (
 
 // DBDeleter Возможно в будущем появятся разные реализации удаления
 type DBDeleter struct {
-	db  *sql.DB
-	cfg config.StorageConfig
+	DB  *sql.DB
+	Cfg config.StorageConfig
 }
 
 // DeleteURL удалить URL в БД
@@ -44,7 +44,7 @@ func (s *DBDeleter) DeleteURL(userID string, shortURLs []string) error {
 	for i := 0; i < workerCount; i++ {
 		go func() {
 			defer wg.Done()
-			worker(s.db, userID, inputChan, errChan)
+			worker(s.DB, userID, inputChan, errChan)
 		}()
 	}
 

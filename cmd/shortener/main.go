@@ -2,22 +2,31 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"flag"
 	"fmt"
+	shortener "github.com/JohnnyConstantin/urlshort/shortener/proto"
 	route "github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
-	"log"
+	"google.golang.org/grpc"
+	"net"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+	"os/signal"
 	"strings"
+	"sync"
+	"syscall"
+	"time"
 
 	"github.com/JohnnyConstantin/urlshort/internal/app"
 	"github.com/JohnnyConstantin/urlshort/internal/certificates"
 	"github.com/JohnnyConstantin/urlshort/internal/config"
 	"github.com/JohnnyConstantin/urlshort/internal/store"
+	"github.com/JohnnyConstantin/urlshort/server/grpc"
+	grpcMiddleware "github.com/grpc-ecosystem/go-grpc-middleware"
 )
 
 var sugar zap.SugaredLogger
@@ -38,10 +47,12 @@ func main() {
 	printBuildInfo()
 
 	var s app.Server
-	server := s.NewServer()
+	service := app.Service{}
+	server := s.NewServer(&service)
 
 	//Чтобы удобнее было работать
 	handler := server.Handler
+
 	router := route.NewRouter() //Используем внешний роутер chi, вместо встроенного в объект app.Server
 
 	//Создаём предустановленный регистратор zap
@@ -64,12 +75,6 @@ func main() {
 	// Вынес загрузку переменных окружения в отдельную функцию
 	loadEnvs()
 
-	// записываем в лог, что сервер запускается
-	sugar.Infow(
-		"Starting server",
-		"addr", config.Options.Address,
-	)
-
 	// Создание и применение конфигурации. Если ошибка - выход с ненулевым кодом. Ошибка при этом логируется в sugar
 	s.DB, err = storageDecider()
 	if err != nil {
@@ -78,13 +83,98 @@ func main() {
 
 	// Запускаем HTTP-сервер для профилирования в отдельной горутине
 	go func() {
-		log.Println(http.ListenAndServe("localhost:6060", nil))
+		sugar.Info(http.ListenAndServe("localhost:6060", nil))
 	}()
 
 	// Вынес создание роутов в отдельную функцию
 	createHandlers(s.DB, router, sugar, handler)
 
-	startListenAndServe(s, router)
+	var wg sync.WaitGroup
+
+	if config.Options.GRPCBaseAddr != "" {
+
+		// записываем в лог, что сервер запускается
+		sugar.Infow(
+			"Starting gRPC server",
+			"addr", config.Options.GRPCBaseAddr,
+		)
+
+		// Стартуем gRPC
+		grpcServer := grpcserver.NewGRPCServer(&service)
+
+		grpcServer.DB, err = storageDecider()
+		if err != nil {
+			panic(err)
+		}
+
+		wg.Add(1)
+		go startGRPCServer(grpcServer, &wg)
+	}
+
+	if config.Options.Address != "" {
+		// записываем в лог, что сервер запускается
+		sugar.Infow(
+			"Starting http server",
+			"addr", config.Options.Address,
+		)
+		go startListenAndServe(s, router)
+	}
+
+	wg.Wait()
+}
+
+func startGRPCServer(server *grpcserver.GRPCServer, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	lis, err := net.Listen("tcp", config.Options.GRPCBaseAddr)
+	if err != nil {
+		return
+	}
+
+	grpcServer := grpc.NewServer(
+		grpc.UnaryInterceptor(grpcMiddleware.ChainUnaryServer(
+			grpcserver.GRPCLoggingInterceptor(&sugar), // аналог WithLogging
+			grpcserver.GRPCAuthInterceptor,            // аналог WithAuth
+		)),
+	)
+
+	shortener.RegisterShortenerServer(grpcServer, server)
+
+	// Канал для получения сигналов остановки
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT)
+
+	serverErr := make(chan error, 1)
+	go func() {
+		if err := grpcServer.Serve(lis); err != nil {
+			serverErr <- err
+		}
+	}()
+
+	select {
+	case <-stop:
+		sugar.Info("Received shutdown signal, gracefully shutting down gRPC server...")
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		stopped := make(chan struct{})
+		go func() {
+			grpcServer.GracefulStop()
+			close(stopped)
+		}()
+
+		select {
+		case <-ctx.Done():
+			sugar.Warn("gRPC server graceful shutdown timed out, forcing stop...")
+			grpcServer.Stop()
+		case <-stopped:
+			sugar.Info("gRPC server gracefully shut down")
+		}
+
+	case err := <-serverErr:
+		sugar.Error("gRPC server error: %v", err)
+	}
 }
 
 func startListenAndServe(s app.Server, router *route.Mux) {
@@ -95,7 +185,7 @@ func startListenAndServe(s app.Server, router *route.Mux) {
 	if config.Options.EnableHTTPS {
 		var cert, key = "cert.crt", "key.key" // Я бы сделал их также через опцию и env, но в задании об
 		// этом явно не сказано, поэтому выбрал захардкодить, чтобы четко соответствовать ТЗ
-		if !certificates.СertFilesExist(cert, key) { // Локально эти файлы есть, но в репу их не загружаю по понятным причинам
+		if !certificates.CertFileExist(cert, key) { // Локально эти файлы есть, но в репу их не загружаю по понятным причинам
 			err := certificates.GenerateCertAndPrivFiles(cert, key)
 			if err != nil {
 				sugar.Error("Failed to generate cert.crt/key.key") // Ошибка если не удалось создать пару
@@ -136,7 +226,7 @@ func waitShutdown(errChan chan error, shutdownChan chan struct{}, sugar zap.Suga
 	go func() {
 		err := s.WaitForShutdown(sugar) // Ожидаем сигнала
 		if err != nil {
-			sugar.Error("Failed while shutting down: ", err)
+			sugar.Error("Failed while shutting down HTTP server: ", err)
 			errChan <- err
 		}
 		shutdownChan <- struct{}{} // Отправляем сигнал об успешном завершении
@@ -146,12 +236,12 @@ func waitShutdown(errChan chan error, shutdownChan chan struct{}, sugar zap.Suga
 	select {
 	case err := <-errChan: // Пришла ошибка
 		if err != nil {
-			sugar.Error("Received error while shutting down server", err)
+			sugar.Error("Received error while shutting down HTTP server", err)
 			return
 		}
-		sugar.Info("Server gracefully shut down")
+		sugar.Info("HTTP server gracefully shut down")
 	case <-shutdownChan: // Пришел сигнал успешного завершения
-		sugar.Info("Server gracefully shut down")
+		sugar.Info("HTTP server gracefully shut down")
 	}
 }
 
@@ -190,6 +280,14 @@ func createHandlers(db *sql.DB, router *route.Mux, sugar zap.SugaredLogger, hand
 							handler.WithAuth( //Добавляем аутентификацию
 								handler.GetHandlerMultiple), sugar))) // Сам хендлер
 
+			})
+			r.Route("/internal", func(r route.Router) {
+				r.Get(
+					"/stats",
+					app.WithLogging(db, // Подключаем логирование
+						app.RequireTrustedIP( // Проверка доверенных подсетей
+							handler.GetHandlerStats), sugar), // Сам хендлер
+				)
 			})
 		})
 		r.Get("/{id}",
@@ -231,6 +329,16 @@ func loadEnvs() {
 	if ok && (strings.ToLower(envF) == "true" || strings.ToLower(envF) == "1") { // Предполагаю, что переменная
 		// окружения должна содержать true или 1 (перевожу в lowercase, чтобы обработать True и TRUE)
 		config.Options.EnableHTTPS = true
+	}
+
+	envG, ok := os.LookupEnv("TRUSTED_SUBNET")
+	if ok { // По условию значение может быть пустым, обработка этого случая находится в хендлере
+		config.Options.TrustedSubnet = envG
+	}
+
+	envH, ok := os.LookupEnv("GRPC_ADDR")
+	if ok && envH != "" {
+		config.Options.GRPCBaseAddr = envH
 	}
 }
 

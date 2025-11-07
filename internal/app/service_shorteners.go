@@ -13,20 +13,20 @@ import (
 
 // DBShortener объект "сворачивания" URL c использованием БД
 type DBShortener struct {
-	db  *sql.DB
-	cfg config.StorageConfig
+	DB  *sql.DB
+	Cfg config.StorageConfig
 }
 
 // FileShortener объект "сворачивания" URL c использованием файла
 type FileShortener struct {
 	mu  *sync.Mutex
-	cfg config.StorageConfig
+	Cfg config.StorageConfig
 }
 
 // MemoryShortener объект "сворачивания" URL c использованием памяти
 type MemoryShortener struct {
 	mu  *sync.Mutex
-	cfg config.StorageConfig
+	Cfg config.StorageConfig
 }
 
 // InitMutex создание мьютекса для сворачивания с файлом
@@ -39,9 +39,15 @@ func (s *MemoryShortener) InitMutex() {
 	s.mu = new(sync.Mutex)
 }
 
+// InitMutex mock для БД
+func (s *DBShortener) InitMutex() {
+}
+
 // ShortenURL сокращает URL с использованием БД
-func (s *DBShortener) ShortenURL(userID string, originalURL string) (models.ShortenResponse, int) {
+func (s *DBShortener) ShortenURL(opts Shortenerequest) models.ShortenResponse {
 	var shortenURL models.ShortenResponse
+	originalURL := opts.OriginalURL
+	userID := opts.UserID
 
 	shortID := uuid.New().String()[:8]
 
@@ -52,19 +58,20 @@ func (s *DBShortener) ShortenURL(userID string, originalURL string) (models.Shor
 		OriginalURL: originalURL,
 	}
 
-	shortID, status, err := store.Insert(s.db, record, userID)
+	shortID, _, err := store.Insert(s.DB, record, userID)
 	if err != nil {
-		return models.ShortenResponse{}, status
+		return models.ShortenResponse{}
 	}
 
 	shortenURL.Result = config.Options.BaseAddress + "/" + shortID
 
-	return shortenURL, status
+	return shortenURL
 }
 
 // ShortenURL сокращает URL с использованием файла
-func (s *FileShortener) ShortenURL(originalURL string) models.ShortenResponse {
+func (s *FileShortener) ShortenURL(opts Shortenerequest) models.ShortenResponse {
 	var shortenURL models.ShortenResponse
+	originalURL := opts.OriginalURL
 
 	shortID := uuid.New().String()[:8]
 
@@ -89,8 +96,9 @@ func (s *FileShortener) ShortenURL(originalURL string) models.ShortenResponse {
 }
 
 // ShortenURL сокращает URL с использованием памяти
-func (s *MemoryShortener) ShortenURL(originalURL string) models.ShortenResponse {
+func (s *MemoryShortener) ShortenURL(opts Shortenerequest) models.ShortenResponse {
 	var shortenURL models.ShortenResponse
+	originalURL := opts.OriginalURL
 
 	shortID := uuid.New().String()[:8]
 

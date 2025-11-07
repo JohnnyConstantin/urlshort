@@ -23,7 +23,8 @@ import (
 // TestPostHandler проверяет хендлер POST запросов
 func TestPostHandler(t *testing.T) {
 	var s Server
-	server := s.NewServer()
+	service := Service{}
+	server := s.NewServer(&service)
 	handler := server.Handler
 
 	// Ранее не прокидывал логгер в хендлеры, поэтому в тестах пришлось тоже везде инициализировать логгер и передавать req с контекстом
@@ -61,7 +62,8 @@ func TestPostHandler(t *testing.T) {
 func BenchmarkPostHandler(t *testing.B) {
 	t.StopTimer() // останавливаем таймер
 	var s Server
-	server := s.NewServer()
+	service := Service{}
+	server := s.NewServer(&service)
 	handler := server.Handler
 
 	loggers, err := zap.NewDevelopment()
@@ -91,7 +93,8 @@ func TestGetHandler(t *testing.T) {
 	config.CreateStorageConfig()
 	testURL := "https://example.com"
 	var s Server
-	server := s.NewServer()
+	service := Service{}
+	server := s.NewServer(&service)
 	handler := server.Handler
 	loggers, err := zap.NewDevelopment()
 	if err != nil {
@@ -135,7 +138,8 @@ func BenchmarkGetHandler(t *testing.B) {
 	config.CreateStorageConfig()
 	testURL := "https://example.com"
 	var s Server
-	server := s.NewServer()
+	service := Service{}
+	server := s.NewServer(&service)
 	handler := server.Handler
 
 	loggers, err := zap.NewDevelopment()
@@ -169,7 +173,8 @@ func BenchmarkGetHandler(t *testing.B) {
 
 func TestPostHandlerMultiple(t *testing.T) {
 	var s Server
-	server := s.NewServer()
+	service := Service{}
+	server := s.NewServer(&service)
 	handler := server.Handler
 
 	tests := []struct {
@@ -492,7 +497,8 @@ func TestGzipHandle(t *testing.T) {
 func BenchmarkPostHandlerMultiple(t *testing.B) {
 	t.StopTimer() // останавливаем таймер
 	var s Server
-	server := s.NewServer()
+	service := Service{}
+	server := s.NewServer(&service)
 	handler := server.Handler
 
 	loggers, err := zap.NewDevelopment()
