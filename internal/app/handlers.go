@@ -203,7 +203,7 @@ func (h *Handler) PostHandler(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) PostHandlerMultiple(w http.ResponseWriter, r *http.Request) {
 	var requests []models.BatchShortenRequest
 	var ShortURL models.ShortenResponse
-	var status int
+	status := http.StatusCreated
 
 	ctx := r.Context()
 
@@ -245,7 +245,6 @@ func (h *Handler) PostHandlerMultiple(w http.ResponseWriter, r *http.Request) {
 		for _, req := range requests {
 			shorten_req := Shortenerequest{OriginalURL: req.OriginalURL}
 			ShortURL = h.Service.Shortener.ShortenURL(shorten_req)
-			status = http.StatusCreated
 
 			responses = append(responses, models.BatchShortenResponse{
 				CorrelationID: req.CorrelationID,
@@ -259,7 +258,6 @@ func (h *Handler) PostHandlerMultiple(w http.ResponseWriter, r *http.Request) {
 		for _, req := range requests {
 			shorten_req := Shortenerequest{OriginalURL: req.OriginalURL}
 			ShortURL = h.Service.Shortener.ShortenURL(shorten_req)
-			status = http.StatusCreated
 
 			responses = append(responses, models.BatchShortenResponse{
 				CorrelationID: req.CorrelationID,

@@ -118,11 +118,11 @@ func startGRPCServer(server *grpcserver.GRPCServer) {
 	}
 
 	grpcServer := grpc.NewServer(
-		//grpc.UnaryInterceptor(grpcMiddleware.ChainUnaryServer(
-		//	grpcAuthInterceptor, // аналог WithAuth
-		//	grpcLoggingInterceptor, // аналог WithLogging
-		//	grpcRecoveryInterceptor,
-		//)),
+	//grpc.UnaryInterceptor(grpcMiddleware.ChainUnaryServer(
+	//	grpcAuthInterceptor, // аналог WithAuth
+	//	grpcLoggingInterceptor, // аналог WithLogging
+	//	grpcRecoveryInterceptor,
+	//)),
 	)
 
 	shortener.RegisterShortenerServer(grpcServer, server)

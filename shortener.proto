@@ -8,10 +8,24 @@ service Shortener {
   rpc CreateShortURL(CreateShortURLRequest) returns (CreateShortURLResponse) {}
   rpc GetOriginalURL(GetOriginalURLRequest) returns (GetOriginalURLResponse) {}
   rpc CreateShortURLBatch(CreateShortURLBatchRequest) returns (CreateShortURLBatchResponse) {}
-  rpc GetUserURLs(GetUserURLsRequest) returns (GetUserURLsResponse) {}
+  rpc GetOriginalURLBatch(GetOriginalURLBatchRequest) returns (GetOriginalURLBatchResponse) {}
   rpc DeleteUserURLs(DeleteUserURLsRequest) returns (DeleteUserURLsResponse) {}
   rpc GetStats(GetStatsRequest) returns (GetStatsResponse) {}
   rpc Ping(PingRequest) returns (PingResponse) {}
+}
+
+message OriginalURL {
+  string original_url = 1;
+}
+
+message ShortenURL {
+  string short_url = 1;
+}
+
+message URLPair {
+  string original_url = 1;
+  string short_url = 2;
+  string correlation_id = 3;
 }
 
 message CreateShortURLRequest {
@@ -24,18 +38,12 @@ message CreateShortURLResponse {
 }
 
 message GetOriginalURLRequest {
-  string short_url_id = 1;
+  string short_url = 1;
 }
 
 message GetOriginalURLResponse {
   string original_url = 1;
   string short_url = 2;
-}
-
-message URLPair {
-  string correlation_id = 1;
-  string original_url = 2;
-  string short_url = 3;
 }
 
 message CreateShortURLBatchRequest {
@@ -46,14 +54,17 @@ message CreateShortURLBatchResponse {
   repeated URLPair urls = 1;
 }
 
-message GetUserURLsRequest {}
+message GetOriginalURLBatchRequest {
+  string user_id = 1;
+}
 
-message GetUserURLsResponse {
+message GetOriginalURLBatchResponse {
   repeated URLPair urls = 1;
 }
 
 message DeleteUserURLsRequest {
-  repeated string url_ids = 1;
+  repeated string urls = 1;
+  string user_id = 2;
 }
 
 message DeleteUserURLsResponse {}

@@ -59,7 +59,7 @@ func (s *GRPCServer) GetOriginalURL(ctx context.Context, req *shortener.GetOrigi
 	exists := false //By default не существует
 	var isDeleted bool
 
-	id := req.GetShortUrlId()
+	id := req.GetShortUrl()
 
 	cfg := config.GetStorageConfig()
 
@@ -88,6 +88,45 @@ func (s *GRPCServer) GetOriginalURL(ctx context.Context, req *shortener.GetOrigi
 
 	return &shortener.GetOriginalURLResponse{
 		OriginalUrl: response.URL,
-		ShortUrl:    req.ShortUrlId,
+		ShortUrl:    req.GetShortUrl(),
+	}, nil
+}
+
+func (s *GRPCServer) CreateShortURLBatch(ctx context.Context, req *shortener.CreateShortURLBatchRequest) (*shortener.CreateShortURLBatchResponse, error) {
+
+	requests := req.GetUrls()
+
+	cfg := config.GetStorageConfig()
+
+	responses := make([]*shortener.URLPair, 0, len(requests))
+
+	switch cfg.StorageType {
+	case config.StorageFile:
+		s.service.Shortener = &service.FileShortener{Cfg: cfg}
+		s.service.Shortener.InitMutex()
+
+	case config.StorageMemory:
+		s.service.Shortener = &service.MemoryShortener{Cfg: cfg}
+		s.service.Shortener.InitMutex()
+
+	case config.StorageDB:
+		s.service.Shortener = &service.DBShortener{Db: s.Db, Cfg: cfg}
+	default:
+		return nil, errors.New("invalid storage type")
+	}
+
+	for _, r := range requests {
+		shorten_req := service.Shortenerequest{OriginalURL: r.OriginalUrl}
+		ShortURL := s.service.Shortener.ShortenURL(shorten_req)
+
+		responses = append(responses, &shortener.URLPair{
+			CorrelationId: r.GetCorrelationId(),
+			ShortUrl:      ShortURL.Result,
+			OriginalUrl:   "", // Возвращаем пустое значение
+		})
+	}
+
+	return &shortener.CreateShortURLBatchResponse{
+		Urls: responses,
 	}, nil
 }

@@ -22,7 +22,7 @@ const (
 	Shortener_CreateShortURL_FullMethodName      = "/shortener.Shortener/CreateShortURL"
 	Shortener_GetOriginalURL_FullMethodName      = "/shortener.Shortener/GetOriginalURL"
 	Shortener_CreateShortURLBatch_FullMethodName = "/shortener.Shortener/CreateShortURLBatch"
-	Shortener_GetUserURLs_FullMethodName         = "/shortener.Shortener/GetUserURLs"
+	Shortener_GetOriginalURLBatch_FullMethodName = "/shortener.Shortener/GetOriginalURLBatch"
 	Shortener_DeleteUserURLs_FullMethodName      = "/shortener.Shortener/DeleteUserURLs"
 	Shortener_GetStats_FullMethodName            = "/shortener.Shortener/GetStats"
 	Shortener_Ping_FullMethodName                = "/shortener.Shortener/Ping"
@@ -35,7 +35,7 @@ type ShortenerClient interface {
 	CreateShortURL(ctx context.Context, in *CreateShortURLRequest, opts ...grpc.CallOption) (*CreateShortURLResponse, error)
 	GetOriginalURL(ctx context.Context, in *GetOriginalURLRequest, opts ...grpc.CallOption) (*GetOriginalURLResponse, error)
 	CreateShortURLBatch(ctx context.Context, in *CreateShortURLBatchRequest, opts ...grpc.CallOption) (*CreateShortURLBatchResponse, error)
-	GetUserURLs(ctx context.Context, in *GetUserURLsRequest, opts ...grpc.CallOption) (*GetUserURLsResponse, error)
+	GetOriginalURLBatch(ctx context.Context, in *GetOriginalURLBatchRequest, opts ...grpc.CallOption) (*GetOriginalURLBatchResponse, error)
 	DeleteUserURLs(ctx context.Context, in *DeleteUserURLsRequest, opts ...grpc.CallOption) (*DeleteUserURLsResponse, error)
 	GetStats(ctx context.Context, in *GetStatsRequest, opts ...grpc.CallOption) (*GetStatsResponse, error)
 	Ping(ctx context.Context, in *PingRequest, opts ...grpc.CallOption) (*PingResponse, error)
@@ -79,10 +79,10 @@ func (c *shortenerClient) CreateShortURLBatch(ctx context.Context, in *CreateSho
 	return out, nil
 }
 
-func (c *shortenerClient) GetUserURLs(ctx context.Context, in *GetUserURLsRequest, opts ...grpc.CallOption) (*GetUserURLsResponse, error) {
+func (c *shortenerClient) GetOriginalURLBatch(ctx context.Context, in *GetOriginalURLBatchRequest, opts ...grpc.CallOption) (*GetOriginalURLBatchResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetUserURLsResponse)
-	err := c.cc.Invoke(ctx, Shortener_GetUserURLs_FullMethodName, in, out, cOpts...)
+	out := new(GetOriginalURLBatchResponse)
+	err := c.cc.Invoke(ctx, Shortener_GetOriginalURLBatch_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +126,7 @@ type ShortenerServer interface {
 	CreateShortURL(context.Context, *CreateShortURLRequest) (*CreateShortURLResponse, error)
 	GetOriginalURL(context.Context, *GetOriginalURLRequest) (*GetOriginalURLResponse, error)
 	CreateShortURLBatch(context.Context, *CreateShortURLBatchRequest) (*CreateShortURLBatchResponse, error)
-	GetUserURLs(context.Context, *GetUserURLsRequest) (*GetUserURLsResponse, error)
+	GetOriginalURLBatch(context.Context, *GetOriginalURLBatchRequest) (*GetOriginalURLBatchResponse, error)
 	DeleteUserURLs(context.Context, *DeleteUserURLsRequest) (*DeleteUserURLsResponse, error)
 	GetStats(context.Context, *GetStatsRequest) (*GetStatsResponse, error)
 	Ping(context.Context, *PingRequest) (*PingResponse, error)
@@ -149,8 +149,8 @@ func (UnimplementedShortenerServer) GetOriginalURL(context.Context, *GetOriginal
 func (UnimplementedShortenerServer) CreateShortURLBatch(context.Context, *CreateShortURLBatchRequest) (*CreateShortURLBatchResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateShortURLBatch not implemented")
 }
-func (UnimplementedShortenerServer) GetUserURLs(context.Context, *GetUserURLsRequest) (*GetUserURLsResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetUserURLs not implemented")
+func (UnimplementedShortenerServer) GetOriginalURLBatch(context.Context, *GetOriginalURLBatchRequest) (*GetOriginalURLBatchResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetOriginalURLBatch not implemented")
 }
 func (UnimplementedShortenerServer) DeleteUserURLs(context.Context, *DeleteUserURLsRequest) (*DeleteUserURLsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteUserURLs not implemented")
@@ -236,20 +236,20 @@ func _Shortener_CreateShortURLBatch_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Shortener_GetUserURLs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetUserURLsRequest)
+func _Shortener_GetOriginalURLBatch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetOriginalURLBatchRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ShortenerServer).GetUserURLs(ctx, in)
+		return srv.(ShortenerServer).GetOriginalURLBatch(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Shortener_GetUserURLs_FullMethodName,
+		FullMethod: Shortener_GetOriginalURLBatch_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ShortenerServer).GetUserURLs(ctx, req.(*GetUserURLsRequest))
+		return srv.(ShortenerServer).GetOriginalURLBatch(ctx, req.(*GetOriginalURLBatchRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -328,8 +328,8 @@ var Shortener_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Shortener_CreateShortURLBatch_Handler,
 		},
 		{
-			MethodName: "GetUserURLs",
-			Handler:    _Shortener_GetUserURLs_Handler,
+			MethodName: "GetOriginalURLBatch",
+			Handler:    _Shortener_GetOriginalURLBatch_Handler,
 		},
 		{
 			MethodName: "DeleteUserURLs",
