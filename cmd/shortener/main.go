@@ -42,7 +42,8 @@ func main() {
 	printBuildInfo()
 
 	var s app.Server
-	server := s.NewServer()
+	service := app.Service{}
+	server := s.NewServer(&service)
 
 	//Чтобы удобнее было работать
 	handler := server.Handler
@@ -69,12 +70,6 @@ func main() {
 	// Вынес загрузку переменных окружения в отдельную функцию
 	loadEnvs()
 
-	// записываем в лог, что сервер запускается
-	sugar.Infow(
-		"Starting server",
-		"addr", config.Options.Address,
-	)
-
 	// Создание и применение конфигурации. Если ошибка - выход с ненулевым кодом. Ошибка при этом логируется в sugar
 	s.DB, err = storageDecider()
 	if err != nil {
@@ -86,14 +81,33 @@ func main() {
 		log.Println(http.ListenAndServe("localhost:6060", nil))
 	}()
 
-	service := app.Service{}
-
 	// Вынес создание роутов в отдельную функцию
 	createHandlers(s.DB, router, sugar, handler)
 
-	grpcServer := grpcserver.NewGRPCServer(&service)
-	go startGRPCServer(grpcServer)
+	if config.Options.GRPCBaseAddr != "" {
 
+		// записываем в лог, что сервер запускается
+		sugar.Infow(
+			"Starting gRPC server",
+			"addr", config.Options.GRPCBaseAddr,
+		)
+
+		// Стартуем gRPC
+		grpcServer := grpcserver.NewGRPCServer(&service)
+
+		grpcServer.Db, err = storageDecider()
+		if err != nil {
+			panic(err)
+		}
+
+		go startGRPCServer(grpcServer)
+	}
+
+	// записываем в лог, что сервер запускается
+	sugar.Infow(
+		"Starting http server",
+		"addr", config.Options.Address,
+	)
 	startListenAndServe(s, router)
 }
 
@@ -104,11 +118,11 @@ func startGRPCServer(server *grpcserver.GRPCServer) {
 	}
 
 	grpcServer := grpc.NewServer(
-	//grpc.UnaryInterceptor(grpcMiddleware.ChainUnaryServer(
-	//	grpcAuthInterceptor, // аналог WithAuth
-	//	grpcLoggingInterceptor, // аналог WithLogging
-	//	grpcRecoveryInterceptor,
-	//)),
+		//grpc.UnaryInterceptor(grpcMiddleware.ChainUnaryServer(
+		//	grpcAuthInterceptor, // аналог WithAuth
+		//	grpcLoggingInterceptor, // аналог WithLogging
+		//	grpcRecoveryInterceptor,
+		//)),
 	)
 
 	shortener.RegisterShortenerServer(grpcServer, server)

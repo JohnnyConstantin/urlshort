@@ -22,9 +22,9 @@ type Server struct {
 }
 
 // NewServer Инициализирует сервер с пустым хендлером и роутером
-func (s *Server) NewServer() *Server {
+func (s *Server) NewServer(service *Service) *Server {
 	serv := &Server{
-		Handler: NewHandler(),
+		Handler: NewHandler(service),
 		Router:  NewRouter(),
 	}
 

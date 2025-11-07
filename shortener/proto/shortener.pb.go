@@ -24,6 +24,7 @@ const (
 type CreateShortURLRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	OriginalUrl   string                 `protobuf:"bytes,1,opt,name=original_url,json=originalUrl,proto3" json:"original_url,omitempty"`
+	UserId        string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -61,6 +62,13 @@ func (*CreateShortURLRequest) Descriptor() ([]byte, []int) {
 func (x *CreateShortURLRequest) GetOriginalUrl() string {
 	if x != nil {
 		return x.OriginalUrl
+	}
+	return ""
+}
+
+func (x *CreateShortURLRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
 	}
 	return ""
 }
@@ -685,9 +693,10 @@ var File_shortener_proto protoreflect.FileDescriptor
 
 const file_shortener_proto_rawDesc = "" +
 	"\n" +
-	"\x0fshortener.proto\x12\tshortener\":\n" +
+	"\x0fshortener.proto\x12\tshortener\"S\n" +
 	"\x15CreateShortURLRequest\x12!\n" +
-	"\foriginal_url\x18\x01 \x01(\tR\voriginalUrl\"5\n" +
+	"\foriginal_url\x18\x01 \x01(\tR\voriginalUrl\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\tR\x06userId\"5\n" +
 	"\x16CreateShortURLResponse\x12\x1b\n" +
 	"\tshort_url\x18\x01 \x01(\tR\bshortUrl\"9\n" +
 	"\x15GetOriginalURLRequest\x12 \n" +

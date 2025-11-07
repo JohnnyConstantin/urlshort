@@ -16,6 +16,7 @@ service Shortener {
 
 message CreateShortURLRequest {
   string original_url = 1;
+  string user_id = 2;
 }
 
 message CreateShortURLResponse {

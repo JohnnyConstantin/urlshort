@@ -203,7 +203,7 @@ func init() {
 	flag.StringVar( // Ключ для gRPC
 		&Options.GRPCBaseAddr,
 		"r",
-		"8085",
+		"127.0.0.1:8085",
 		"gRPC base address",
 	)
 }

@@ -13,6 +13,7 @@ import (
 type GRPCServer struct {
 	shortener.UnimplementedShortenerServer
 	service *service.Service
+	Db      *sql.DB
 }
 
 func NewGRPCServer(service *service.Service) *GRPCServer {
@@ -21,7 +22,8 @@ func NewGRPCServer(service *service.Service) *GRPCServer {
 	}
 }
 
-// В архитектуре заранее был заложен абстрактный слой сервиса, поэтому буквально повторяем обращения к сервисам, как и в HTTP хендлерах
+// В архитектуре заранее был заложен абстрактный слой сервиса, поэтому просто повторяем обращения к
+// сервисам с небольшими правками, как и в HTTP хендлерах
 func (s *GRPCServer) CreateShortURL(ctx context.Context, r *shortener.CreateShortURLRequest) (*shortener.CreateShortURLResponse, error) {
 
 	var ShortURL models.ShortenResponse
@@ -39,14 +41,9 @@ func (s *GRPCServer) CreateShortURL(ctx context.Context, r *shortener.CreateShor
 		shorten_req := service.Shortenerequest{OriginalURL: r.OriginalUrl}
 		ShortURL = s.service.Shortener.ShortenURL(shorten_req)
 	case config.StorageDB:
-		db, userID, errs := initCtx(ctx)
-		if errs != nil {
-			return nil, errs
-		}
-
-		s.service.Shortener = &service.DBShortener{Db: db, Cfg: cfg}
-		short := service.DBShortener{Db: db, Cfg: cfg}
-		shorten_req := service.Shortenerequest{OriginalURL: r.OriginalUrl, UserID: userID}
+		s.service.Shortener = &service.DBShortener{Db: s.Db, Cfg: cfg}
+		short := service.DBShortener{Db: s.Db, Cfg: cfg}
+		shorten_req := service.Shortenerequest{OriginalURL: r.OriginalUrl, UserID: r.UserId}
 
 		ShortURL = short.ShortenURL(shorten_req)
 	default:
@@ -56,35 +53,41 @@ func (s *GRPCServer) CreateShortURL(ctx context.Context, r *shortener.CreateShor
 	return &shortener.CreateShortURLResponse{ShortUrl: ShortURL.Result}, nil
 }
 
-//func (s *GRPCServer) GetOriginalURL(ctx context.Context, req *shortener.GetOriginalURLRequest) (*shortener.GetOriginalURLResponse, error) {
-//	originalURL, err := s.service.GetOriginalURL(ctx, req.ShortUrlId)
-//	if err != nil {
-//		return nil, err
-//	}
-//
-//	return &shortener.GetOriginalURLResponse{
-//		OriginalUrl: originalURL,
-//		ShortUrl:    s.service.BuildShortURL(req.ShortUrlId),
-//	}, nil
-//}
-//
-//// Аналогично реализуйте остальные методы...
-//
-//func (s *GRPCServer) getUserIDFromContext(ctx context.Context) string {
-//	// Логика извлечения userID из контекста (аналог WithAuth)
-//	return "user-id-from-token"
-//}
+func (s *GRPCServer) GetOriginalURL(ctx context.Context, req *shortener.GetOriginalURLRequest) (*shortener.GetOriginalURLResponse, error) {
 
-// Здесь своя приватная инициализация контекста, поскольку с HTTP они отличаются
-func initCtx(ctx context.Context) (*sql.DB, string, error) {
-	db, ok := ctx.Value(service.DbKey).(*sql.DB)
-	if !ok {
-		return nil, "", errors.New("DB not in context")
-	}
-	userID, ok := ctx.Value(service.User).(string)
-	if !ok {
-		return nil, "", errors.New("userID not found in context")
+	response := models.ShortenRequest{URL: ""}
+	exists := false //By default не существует
+	var isDeleted bool
+
+	id := req.GetShortUrlId()
+
+	cfg := config.GetStorageConfig()
+
+	switch cfg.StorageType {
+	case config.StorageFile:
+		s.service.Fuller = &service.FileFuller{Cfg: cfg}
+		s.service.Fuller.InitMutex()
+		response, exists, _ = s.service.Fuller.GetFullURL(id)
+	case config.StorageMemory:
+		s.service.Fuller = &service.MemoryFuller{Cfg: cfg}
+		s.service.Fuller.InitMutex()
+		response, exists, _ = s.service.Fuller.GetFullURL(id)
+	case config.StorageDB:
+		s.service.Fuller = &service.DBFuller{Db: s.Db, Cfg: cfg}
+		response, exists, isDeleted = s.service.Fuller.GetFullURL(id)
+		if isDeleted {
+			return nil, errors.New("this URL was deleted")
+		}
+	default:
+		return nil, errors.New("invalid storage type")
 	}
 
-	return db, userID, nil
+	if !exists {
+		return nil, errors.New("this URL does not exist")
+	}
+
+	return &shortener.GetOriginalURLResponse{
+		OriginalUrl: response.URL,
+		ShortUrl:    req.ShortUrlId,
+	}, nil
 }

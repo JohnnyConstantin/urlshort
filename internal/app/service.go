@@ -16,9 +16,11 @@ type Shortener interface {
 }
 
 type Fuller interface {
-	GetFullURL(s string) (models.ShortenRequest, bool)
+	GetFullURL(id string) (models.ShortenRequest, bool, bool)
+	InitMutex()
 }
 
+// Общая "точка входа" (витрина) для shortener и fuller
 type Service struct {
 	Shortener Shortener
 	Fuller    Fuller
