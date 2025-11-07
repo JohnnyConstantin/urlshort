@@ -15,7 +15,7 @@ type (
 )
 
 const (
-	dbKey     key    = "database"
+	DbKey     key    = "database"
 	loggerKey logger = "sugar"
 )
 
@@ -53,7 +53,7 @@ func WithLogging(db *sql.DB, h http.HandlerFunc, logger zap.SugaredLogger) http.
 	return func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now() // Засекаем
 
-		ctx := context.WithValue(r.Context(), dbKey, db)
+		ctx := context.WithValue(r.Context(), DbKey, db)
 		ctx = context.WithValue(ctx, loggerKey, logger)
 
 		responseData := &responseData{

@@ -1,0 +1,71 @@
+syntax = "proto3";
+
+package shortener;
+
+option go_package = "shortener/proto";
+
+service Shortener {
+  rpc CreateShortURL(CreateShortURLRequest) returns (CreateShortURLResponse) {}
+  rpc GetOriginalURL(GetOriginalURLRequest) returns (GetOriginalURLResponse) {}
+  rpc CreateShortURLBatch(CreateShortURLBatchRequest) returns (CreateShortURLBatchResponse) {}
+  rpc GetUserURLs(GetUserURLsRequest) returns (GetUserURLsResponse) {}
+  rpc DeleteUserURLs(DeleteUserURLsRequest) returns (DeleteUserURLsResponse) {}
+  rpc GetStats(GetStatsRequest) returns (GetStatsResponse) {}
+  rpc Ping(PingRequest) returns (PingResponse) {}
+}
+
+message CreateShortURLRequest {
+  string original_url = 1;
+}
+
+message CreateShortURLResponse {
+  string short_url = 1;
+}
+
+message GetOriginalURLRequest {
+  string short_url_id = 1;
+}
+
+message GetOriginalURLResponse {
+  string original_url = 1;
+  string short_url = 2;
+}
+
+message URLPair {
+  string correlation_id = 1;
+  string original_url = 2;
+  string short_url = 3;
+}
+
+message CreateShortURLBatchRequest {
+  repeated URLPair urls = 1;
+}
+
+message CreateShortURLBatchResponse {
+  repeated URLPair urls = 1;
+}
+
+message GetUserURLsRequest {}
+
+message GetUserURLsResponse {
+  repeated URLPair urls = 1;
+}
+
+message DeleteUserURLsRequest {
+  repeated string url_ids = 1;
+}
+
+message DeleteUserURLsResponse {}
+
+message GetStatsRequest {}
+
+message GetStatsResponse {
+  int64 urls_count = 1;
+  int64 users_count = 2;
+}
+
+message PingRequest {}
+
+message PingResponse {
+  bool success = 1;
+}

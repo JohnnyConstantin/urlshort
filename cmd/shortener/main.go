@@ -6,9 +6,12 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	shortener "github.com/JohnnyConstantin/urlshort/shortener/proto"
 	route "github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
+	"google.golang.org/grpc"
 	"log"
+	"net"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -18,6 +21,7 @@ import (
 	"github.com/JohnnyConstantin/urlshort/internal/certificates"
 	"github.com/JohnnyConstantin/urlshort/internal/config"
 	"github.com/JohnnyConstantin/urlshort/internal/store"
+	"github.com/JohnnyConstantin/urlshort/server/grpc"
 )
 
 var sugar zap.SugaredLogger
@@ -42,6 +46,7 @@ func main() {
 
 	//Чтобы удобнее было работать
 	handler := server.Handler
+
 	router := route.NewRouter() //Используем внешний роутер chi, вместо встроенного в объект app.Server
 
 	//Создаём предустановленный регистратор zap
@@ -81,10 +86,36 @@ func main() {
 		log.Println(http.ListenAndServe("localhost:6060", nil))
 	}()
 
+	service := app.Service{}
+
 	// Вынес создание роутов в отдельную функцию
 	createHandlers(s.DB, router, sugar, handler)
 
+	grpcServer := grpcserver.NewGRPCServer(&service)
+	go startGRPCServer(grpcServer)
+
 	startListenAndServe(s, router)
+}
+
+func startGRPCServer(server *grpcserver.GRPCServer) {
+	lis, err := net.Listen("tcp", config.Options.GRPCBaseAddr)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	grpcServer := grpc.NewServer(
+	//grpc.UnaryInterceptor(grpcMiddleware.ChainUnaryServer(
+	//	grpcAuthInterceptor, // аналог WithAuth
+	//	grpcLoggingInterceptor, // аналог WithLogging
+	//	grpcRecoveryInterceptor,
+	//)),
+	)
+
+	shortener.RegisterShortenerServer(grpcServer, server)
+
+	if err := grpcServer.Serve(lis); err != nil {
+		log.Fatal(err)
+	}
 }
 
 func startListenAndServe(s app.Server, router *route.Mux) {

@@ -4,11 +4,24 @@ import (
 	"github.com/JohnnyConstantin/urlshort/models"
 )
 
+type Shortenerequest struct {
+	OriginalURL string
+	UserID      string
+}
+
 // Shortener интерфейс для разных функций бизнес-логики в зависимости от используемого StorageType
 type Shortener interface {
-	ShortenURL(originalURL string) models.ShortenResponse    // Используется для сжатия URL, используя оригинал
-	GetFullURL(shortID string) (models.ShortenRequest, bool) // Используется для получения полного URL, используя короткий
-	DeleteURL(userID string) error
+	ShortenURL(opts Shortenerequest) models.ShortenResponse // Используется для сжатия URL, используя оригинал
+	InitMutex()
+}
+
+type Fuller interface {
+	GetFullURL(s string) (models.ShortenRequest, bool)
+}
+
+type Service struct {
+	Shortener Shortener
+	Fuller    Fuller
 }
 
 // Statter интерфейс для разных функций cтатистики в зависимости от используемого StorageType

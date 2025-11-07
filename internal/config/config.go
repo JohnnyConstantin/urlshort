@@ -34,6 +34,7 @@ var Options struct {
 	DSN           string
 	FileToWrite   string
 	SecretKey     string
+	GRPCBaseAddr  string
 	Config        string // Добвалена опция для конфига
 	EnableHTTPS   bool   // Добавлена опция на HTTPS
 	TrustedSubnet string
@@ -198,6 +199,12 @@ func init() {
 		"t",
 		"",
 		"Provide trusted subnet to get statistics",
+	)
+	flag.StringVar( // Ключ для gRPC
+		&Options.GRPCBaseAddr,
+		"r",
+		"8085",
+		"gRPC base address",
 	)
 }
 

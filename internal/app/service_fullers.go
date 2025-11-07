@@ -18,13 +18,13 @@ type DBFuller struct {
 // FileFuller объект "разворачивания" URL c использованием файла
 type FileFuller struct {
 	mu  *sync.Mutex
-	cfg config.StorageConfig
+	Cfg config.StorageConfig
 }
 
 // MemoryFuller объект "разворачивания" URL c использованием хранилища в памяти
 type MemoryFuller struct {
 	mu  *sync.Mutex
-	cfg config.StorageConfig
+	Cfg config.StorageConfig
 }
 
 // InitMutex создание мьютекса для файлового разворачивателя
@@ -35,6 +35,10 @@ func (f *FileFuller) InitMutex() {
 // InitMutex создание мьютекса для разворачивателя в памяти
 func (f *MemoryFuller) InitMutex() {
 	f.mu = new(sync.Mutex)
+}
+
+// InitMutex mock для БД
+func (s *DBFuller) InitMutex() {
 }
 
 // GetFullURL получить из БД полную URL по сокращенному
