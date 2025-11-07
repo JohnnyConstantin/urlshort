@@ -67,7 +67,9 @@ message DeleteUserURLsRequest {
   string user_id = 2;
 }
 
-message DeleteUserURLsResponse {}
+message DeleteUserURLsResponse {
+  string result = 1;
+}
 
 message GetStatsRequest {}
 

@@ -43,6 +43,7 @@ func (h *Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
 	exists := false //By default не существует
 	var isDeleted bool
 	var status int
+	var err error
 	path := strings.Trim(r.URL.Path, "/")
 	parts := strings.Split(path, "/")
 
@@ -69,11 +70,21 @@ func (h *Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
 	case config.StorageFile:
 		h.Service.Fuller = &FileFuller{Cfg: cfg}
 		h.Service.Fuller.InitMutex()
-		response, exists, _ = h.Service.Fuller.GetFullURL(id)
+		response, exists, isDeleted, err = h.Service.Fuller.GetFullURL(id)
+		if err != nil {
+			sugar.Error(err)
+			http.Error(w, store.DefaultError, http.StatusInternalServerError)
+			return
+		}
 	case config.StorageMemory:
 		h.Service.Fuller = &MemoryFuller{Cfg: cfg}
 		h.Service.Fuller.InitMutex()
-		response, exists, _ = h.Service.Fuller.GetFullURL(id)
+		response, exists, isDeleted, err = h.Service.Fuller.GetFullURL(id)
+		if err != nil {
+			sugar.Error(err)
+			http.Error(w, store.DefaultError, store.DefaultErrorCode)
+			return
+		}
 	case config.StorageDB:
 		// Если StorageDB, то в context не может быть nil (на это есть проверка в main), однако, на всякий случай здесь повторяем
 		db, ok := r.Context().Value(DbKey).(*sql.DB)
@@ -84,7 +95,12 @@ func (h *Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		h.Service.Fuller = &DBFuller{db, cfg}
-		response, exists, isDeleted = h.Service.Fuller.GetFullURL(id)
+		response, exists, isDeleted, err = h.Service.Fuller.GetFullURL(id)
+		if err != nil {
+			sugar.Error(err)
+			http.Error(w, store.DefaultError, http.StatusInternalServerError)
+			return
+		}
 		if isDeleted {
 			status = http.StatusGone
 		}
@@ -311,7 +327,7 @@ func (h *Handler) DeleteHandlerMultiple(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	deleter := DBDeleter{cfg: config.GetStorageConfig(), db: db}
+	deleter := DBDeleter{Cfg: config.GetStorageConfig(), Db: db}
 
 	// Парсим тело запроса
 	var shortURLs []string

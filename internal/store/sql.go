@@ -117,7 +117,7 @@ func Read(db *sql.DB, shortID string) (string, bool, bool, error) {
 	}
 }
 
-// ReadWithUUID Вычитывает original_url по shortID и userID
+// ReadWithUUID Вычитывает original_url по userID
 func ReadWithUUID(db *sql.DB, userID string) ([]models.URLResponse, error) {
 	var result []models.URLResponse
 

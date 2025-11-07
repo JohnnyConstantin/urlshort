@@ -591,6 +591,7 @@ func (x *DeleteUserURLsRequest) GetUserId() string {
 
 type DeleteUserURLsResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
+	Result        string                 `protobuf:"bytes,1,opt,name=result,proto3" json:"result,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -623,6 +624,13 @@ func (x *DeleteUserURLsResponse) ProtoReflect() protoreflect.Message {
 // Deprecated: Use DeleteUserURLsResponse.ProtoReflect.Descriptor instead.
 func (*DeleteUserURLsResponse) Descriptor() ([]byte, []int) {
 	return file_shortener_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *DeleteUserURLsResponse) GetResult() string {
+	if x != nil {
+		return x.Result
+	}
+	return ""
 }
 
 type GetStatsRequest struct {
@@ -827,8 +835,9 @@ const file_shortener_proto_rawDesc = "" +
 	"\x04urls\x18\x01 \x03(\v2\x12.shortener.URLPairR\x04urls\"D\n" +
 	"\x15DeleteUserURLsRequest\x12\x12\n" +
 	"\x04urls\x18\x01 \x03(\tR\x04urls\x12\x17\n" +
-	"\auser_id\x18\x02 \x01(\tR\x06userId\"\x18\n" +
-	"\x16DeleteUserURLsResponse\"\x11\n" +
+	"\auser_id\x18\x02 \x01(\tR\x06userId\"0\n" +
+	"\x16DeleteUserURLsResponse\x12\x16\n" +
+	"\x06result\x18\x01 \x01(\tR\x06result\"\x11\n" +
 	"\x0fGetStatsRequest\"R\n" +
 	"\x10GetStatsResponse\x12\x1d\n" +
 	"\n" +

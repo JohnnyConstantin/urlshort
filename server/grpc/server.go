@@ -6,6 +6,7 @@ import (
 	"errors"
 	service "github.com/JohnnyConstantin/urlshort/internal/app"
 	"github.com/JohnnyConstantin/urlshort/internal/config"
+	"github.com/JohnnyConstantin/urlshort/internal/store"
 	"github.com/JohnnyConstantin/urlshort/models"
 	shortener "github.com/JohnnyConstantin/urlshort/shortener/proto"
 )
@@ -58,6 +59,7 @@ func (s *GRPCServer) GetOriginalURL(ctx context.Context, req *shortener.GetOrigi
 	response := models.ShortenRequest{URL: ""}
 	exists := false //By default не существует
 	var isDeleted bool
+	var err error
 
 	id := req.GetShortUrl()
 
@@ -67,14 +69,23 @@ func (s *GRPCServer) GetOriginalURL(ctx context.Context, req *shortener.GetOrigi
 	case config.StorageFile:
 		s.service.Fuller = &service.FileFuller{Cfg: cfg}
 		s.service.Fuller.InitMutex()
-		response, exists, _ = s.service.Fuller.GetFullURL(id)
+		response, exists, isDeleted, err = s.service.Fuller.GetFullURL(id)
+		if err != nil {
+			return nil, err
+		}
 	case config.StorageMemory:
 		s.service.Fuller = &service.MemoryFuller{Cfg: cfg}
 		s.service.Fuller.InitMutex()
-		response, exists, _ = s.service.Fuller.GetFullURL(id)
+		response, exists, isDeleted, err = s.service.Fuller.GetFullURL(id)
+		if err != nil {
+			return nil, err
+		}
 	case config.StorageDB:
 		s.service.Fuller = &service.DBFuller{Db: s.Db, Cfg: cfg}
-		response, exists, isDeleted = s.service.Fuller.GetFullURL(id)
+		response, exists, isDeleted, err = s.service.Fuller.GetFullURL(id)
+		if err != nil {
+			return nil, err
+		}
 		if isDeleted {
 			return nil, errors.New("this URL was deleted")
 		}
@@ -129,4 +140,112 @@ func (s *GRPCServer) CreateShortURLBatch(ctx context.Context, req *shortener.Cre
 	return &shortener.CreateShortURLBatchResponse{
 		Urls: responses,
 	}, nil
+}
+
+func (s *GRPCServer) GetOriginalURLBatch(ctx context.Context, req *shortener.GetOriginalURLBatchRequest) (*shortener.GetOriginalURLBatchResponse, error) {
+
+	userID := req.GetUserId()
+
+	cfg := config.GetStorageConfig()
+
+	var response []*shortener.URLPair
+
+	switch cfg.StorageType {
+	case config.StorageFile:
+		s.service.Fuller = &service.FileFuller{Cfg: cfg}
+		s.service.Fuller.InitMutex()
+
+	case config.StorageMemory:
+		s.service.Fuller = &service.MemoryFuller{Cfg: cfg}
+		s.service.Fuller.InitMutex()
+
+	case config.StorageDB:
+		s.service.Fuller = &service.DBFuller{Db: s.Db, Cfg: cfg}
+	default:
+		return nil, errors.New("invalid storage type")
+	}
+
+	urls, err := store.ReadWithUUID(s.Db, userID)
+	if err != nil {
+		return nil, errors.New("error while reading user urls")
+	}
+
+	if len(urls) == 0 {
+		return nil, errors.New("no content")
+	}
+
+	for _, url := range urls {
+		response = append(response, &shortener.URLPair{
+			OriginalUrl: url.OriginalURL,
+			ShortUrl:    url.ShortURL,
+		})
+	}
+
+	return &shortener.GetOriginalURLBatchResponse{
+		Urls: response,
+	}, nil
+}
+
+func (s *GRPCServer) DeleteUserURLs(ctx context.Context, req *shortener.DeleteUserURLsRequest) (*shortener.DeleteUserURLsResponse, error) {
+	userID := req.GetUserId()
+	shortURLs := req.GetUrls()
+	cfg := config.GetStorageConfig()
+
+	deleter := service.DBDeleter{Cfg: cfg, Db: s.Db}
+
+	err := deleter.DeleteURL(userID, shortURLs)
+	if err != nil {
+		return nil, err
+	}
+
+	return &shortener.DeleteUserURLsResponse{
+		Result: "Successfully deleted",
+	}, nil
+
+}
+
+func (s *GRPCServer) GetStats(ctx context.Context, req *shortener.GetStatsRequest) (*shortener.GetStatsResponse, error) {
+	var statistics service.Statter
+
+	cfg := config.GetStorageConfig()
+
+	switch cfg.StorageType {
+	case config.StorageFile:
+		statistics = service.NewFileStatistics(cfg)
+
+	case config.StorageMemory:
+		statistics = service.NewMemoryStatistics(cfg)
+
+	case config.StorageDB:
+		statistics = service.NewDBStatistics(s.Db, cfg)
+
+	default: // Overkill, но перестраховаться нужно
+		return nil, errors.New("invalid storage type")
+	}
+
+	cnt, err := statistics.GetURLsCount()
+	if err != nil {
+		return nil, err
+	}
+	usrs, err := statistics.GetUsersCount()
+	if err != nil {
+		return nil, err
+	}
+
+	return &shortener.GetStatsResponse{
+		UrlsCount:  int64(usrs),
+		UsersCount: int64(cnt),
+	}, nil
+}
+
+func (s *GRPCServer) Ping(ctx context.Context, req *shortener.PingRequest) (*shortener.PingResponse, error) {
+	var result bool
+	err := s.Db.Ping()
+	if err != nil {
+		result = false
+		return &shortener.PingResponse{Success: result}, err
+	}
+
+	result = true
+	return &shortener.PingResponse{Success: result}, nil
 }

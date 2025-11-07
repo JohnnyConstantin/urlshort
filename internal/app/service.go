@@ -16,7 +16,7 @@ type Shortener interface {
 }
 
 type Fuller interface {
-	GetFullURL(id string) (models.ShortenRequest, bool, bool)
+	GetFullURL(id string) (models.ShortenRequest, bool, bool, error)
 	InitMutex()
 }
 
