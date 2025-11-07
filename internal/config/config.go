@@ -58,6 +58,7 @@ type JSONConfig struct {
 	DatabaseDSN     string `json:"database_dsn"`
 	TrustedSubnet   string `json:"trusted_subnet"`
 	EnableHTTPS     bool   `json:"enable_https"`
+	GRPCBaseAddr    string `json:"grpc_addr"`
 }
 
 // Config Объект глобального конфига
@@ -112,6 +113,8 @@ func ApplyJSONConfig(jsonConfig *JSONConfig, flagsParsed bool) {
 	fileToWriteSet := isFlagSet("f")
 	dsnSet := isFlagSet("d")
 	enableHTTPSSet := isFlagSet("s")
+	trustedSubnetSet := isFlagSet("t")
+	grpcAddrSet := isFlagSet("r")
 
 	// Применяем JSON конфиг только если флаг НЕ был установлен явно
 	if !addressSet {
@@ -128,6 +131,12 @@ func ApplyJSONConfig(jsonConfig *JSONConfig, flagsParsed bool) {
 	}
 	if !enableHTTPSSet {
 		Options.EnableHTTPS = jsonConfig.EnableHTTPS
+	}
+	if !trustedSubnetSet {
+		Options.TrustedSubnet = jsonConfig.TrustedSubnet
+	}
+	if !grpcAddrSet {
+		Options.GRPCBaseAddr = jsonConfig.GRPCBaseAddr
 	}
 }
 

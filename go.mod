@@ -6,6 +6,7 @@ require (
 	github.com/go-chi/chi/v5 v5.2.3
 	github.com/google/uuid v1.6.0
 	github.com/gordonklaus/ineffassign v0.2.0
+	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 	github.com/jackc/pgx/v5 v5.7.5
 	github.com/kisielk/errcheck v1.9.0
 	github.com/stretchr/testify v1.10.0

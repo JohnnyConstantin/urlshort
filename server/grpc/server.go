@@ -9,6 +9,8 @@ import (
 	"github.com/JohnnyConstantin/urlshort/internal/store"
 	"github.com/JohnnyConstantin/urlshort/models"
 	shortener "github.com/JohnnyConstantin/urlshort/shortener/proto"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type GRPCServer struct {
@@ -28,29 +30,34 @@ func NewGRPCServer(service *service.Service) *GRPCServer {
 func (s *GRPCServer) CreateShortURL(ctx context.Context, r *shortener.CreateShortURLRequest) (*shortener.CreateShortURLResponse, error) {
 
 	var ShortURL models.ShortenResponse
+	userID, ok := GetUserIDFromContext(ctx)
+	if !ok {
+		return nil, status.Error(codes.Internal, "Missing user ID in context")
+	}
 
 	cfg := config.GetStorageConfig()
 	switch cfg.StorageType {
 	case config.StorageFile:
 		s.service.Shortener = &service.FileShortener{Cfg: cfg}
 		s.service.Shortener.InitMutex()
-		shorten_req := service.Shortenerequest{OriginalURL: r.OriginalUrl}
+		shorten_req := service.Shortenerequest{OriginalURL: r.OriginalUrl, UserID: userID}
 		ShortURL = s.service.Shortener.ShortenURL(shorten_req)
 	case config.StorageMemory:
 		s.service.Shortener = &service.MemoryShortener{Cfg: cfg}
 		s.service.Shortener.InitMutex()
-		shorten_req := service.Shortenerequest{OriginalURL: r.OriginalUrl}
+		shorten_req := service.Shortenerequest{OriginalURL: r.OriginalUrl, UserID: userID}
 		ShortURL = s.service.Shortener.ShortenURL(shorten_req)
 	case config.StorageDB:
 		s.service.Shortener = &service.DBShortener{Db: s.Db, Cfg: cfg}
 		short := service.DBShortener{Db: s.Db, Cfg: cfg}
-		shorten_req := service.Shortenerequest{OriginalURL: r.OriginalUrl, UserID: r.UserId}
+		shorten_req := service.Shortenerequest{OriginalURL: r.OriginalUrl, UserID: userID}
 
 		ShortURL = short.ShortenURL(shorten_req)
 	default:
-		return nil, errors.New("invalid storage type")
+		return nil, status.Error(codes.Internal, "Unsupported storage type")
 	}
 
+	status.New(codes.OK, "OK") // Для максимальной идентичности HTTP сервису
 	return &shortener.CreateShortURLResponse{ShortUrl: ShortURL.Result}, nil
 }
 
@@ -71,7 +78,7 @@ func (s *GRPCServer) GetOriginalURL(ctx context.Context, req *shortener.GetOrigi
 		s.service.Fuller.InitMutex()
 		response, exists, isDeleted, err = s.service.Fuller.GetFullURL(id)
 		if err != nil {
-			return nil, err
+			return nil, status.Error(codes.Internal, "Error in getting full url")
 		}
 	case config.StorageMemory:
 		s.service.Fuller = &service.MemoryFuller{Cfg: cfg}
@@ -90,13 +97,14 @@ func (s *GRPCServer) GetOriginalURL(ctx context.Context, req *shortener.GetOrigi
 			return nil, errors.New("this URL was deleted")
 		}
 	default:
-		return nil, errors.New("invalid storage type")
+		return nil, status.Error(codes.Internal, "Unsupported storage type")
 	}
 
 	if !exists {
-		return nil, errors.New("this URL does not exist")
+		return nil, status.Error(codes.NotFound, "this URL does not exist")
 	}
 
+	status.New(codes.OK, "OK") // Для максимальной идентичности HTTP сервису
 	return &shortener.GetOriginalURLResponse{
 		OriginalUrl: response.URL,
 		ShortUrl:    req.GetShortUrl(),
@@ -106,6 +114,11 @@ func (s *GRPCServer) GetOriginalURL(ctx context.Context, req *shortener.GetOrigi
 func (s *GRPCServer) CreateShortURLBatch(ctx context.Context, req *shortener.CreateShortURLBatchRequest) (*shortener.CreateShortURLBatchResponse, error) {
 
 	requests := req.GetUrls()
+
+	userID, ok := GetUserIDFromContext(ctx)
+	if !ok {
+		return nil, status.Error(codes.Internal, "Missing user ID in context")
+	}
 
 	cfg := config.GetStorageConfig()
 
@@ -123,11 +136,11 @@ func (s *GRPCServer) CreateShortURLBatch(ctx context.Context, req *shortener.Cre
 	case config.StorageDB:
 		s.service.Shortener = &service.DBShortener{Db: s.Db, Cfg: cfg}
 	default:
-		return nil, errors.New("invalid storage type")
+		return nil, status.Error(codes.Internal, "Unsupported storage type")
 	}
 
 	for _, r := range requests {
-		shorten_req := service.Shortenerequest{OriginalURL: r.OriginalUrl}
+		shorten_req := service.Shortenerequest{OriginalURL: r.OriginalUrl, UserID: userID}
 		ShortURL := s.service.Shortener.ShortenURL(shorten_req)
 
 		responses = append(responses, &shortener.URLPair{
@@ -137,6 +150,7 @@ func (s *GRPCServer) CreateShortURLBatch(ctx context.Context, req *shortener.Cre
 		})
 	}
 
+	status.New(codes.OK, "OK") // Для максимальной идентичности HTTP сервису
 	return &shortener.CreateShortURLBatchResponse{
 		Urls: responses,
 	}, nil
@@ -144,7 +158,10 @@ func (s *GRPCServer) CreateShortURLBatch(ctx context.Context, req *shortener.Cre
 
 func (s *GRPCServer) GetOriginalURLBatch(ctx context.Context, req *shortener.GetOriginalURLBatchRequest) (*shortener.GetOriginalURLBatchResponse, error) {
 
-	userID := req.GetUserId()
+	userID, ok := GetUserIDFromContext(ctx)
+	if !ok {
+		return nil, status.Error(codes.Internal, "userID not found in context")
+	}
 
 	cfg := config.GetStorageConfig()
 
@@ -162,16 +179,16 @@ func (s *GRPCServer) GetOriginalURLBatch(ctx context.Context, req *shortener.Get
 	case config.StorageDB:
 		s.service.Fuller = &service.DBFuller{Db: s.Db, Cfg: cfg}
 	default:
-		return nil, errors.New("invalid storage type")
+		return nil, status.Error(codes.Internal, "Unsupported storage type")
 	}
 
 	urls, err := store.ReadWithUUID(s.Db, userID)
 	if err != nil {
-		return nil, errors.New("error while reading user urls")
+		return nil, status.Error(codes.Internal, "error while reading user urls")
 	}
 
 	if len(urls) == 0 {
-		return nil, errors.New("no content")
+		return nil, status.Error(codes.Internal, "no content")
 	}
 
 	for _, url := range urls {
@@ -181,13 +198,17 @@ func (s *GRPCServer) GetOriginalURLBatch(ctx context.Context, req *shortener.Get
 		})
 	}
 
+	status.New(codes.OK, "OK") // Для максимальной идентичности HTTP сервису
 	return &shortener.GetOriginalURLBatchResponse{
 		Urls: response,
 	}, nil
 }
 
 func (s *GRPCServer) DeleteUserURLs(ctx context.Context, req *shortener.DeleteUserURLsRequest) (*shortener.DeleteUserURLsResponse, error) {
-	userID := req.GetUserId()
+	userID, ok := GetUserIDFromContext(ctx)
+	if !ok {
+		return nil, status.Error(codes.Internal, "userID not found in context")
+	}
 	shortURLs := req.GetUrls()
 	cfg := config.GetStorageConfig()
 
@@ -198,6 +219,7 @@ func (s *GRPCServer) DeleteUserURLs(ctx context.Context, req *shortener.DeleteUs
 		return nil, err
 	}
 
+	status.New(codes.OK, "OK") // Для максимальной идентичности HTTP сервису
 	return &shortener.DeleteUserURLsResponse{
 		Result: "Successfully deleted",
 	}, nil
@@ -220,7 +242,7 @@ func (s *GRPCServer) GetStats(ctx context.Context, req *shortener.GetStatsReques
 		statistics = service.NewDBStatistics(s.Db, cfg)
 
 	default: // Overkill, но перестраховаться нужно
-		return nil, errors.New("invalid storage type")
+		return nil, status.Error(codes.Internal, "Unsupported storage type")
 	}
 
 	cnt, err := statistics.GetURLsCount()
@@ -232,9 +254,10 @@ func (s *GRPCServer) GetStats(ctx context.Context, req *shortener.GetStatsReques
 		return nil, err
 	}
 
+	status.New(codes.OK, "OK") // Для максимальной идентичности HTTP сервису
 	return &shortener.GetStatsResponse{
-		UrlsCount:  int64(usrs),
-		UsersCount: int64(cnt),
+		UrlsCount:  int64(cnt),
+		UsersCount: int64(usrs),
 	}, nil
 }
 
@@ -243,9 +266,11 @@ func (s *GRPCServer) Ping(ctx context.Context, req *shortener.PingRequest) (*sho
 	err := s.Db.Ping()
 	if err != nil {
 		result = false
+		status.New(codes.Aborted, "Fail") // Для максимальной идентичности HTTP сервису
 		return &shortener.PingResponse{Success: result}, err
 	}
 
 	result = true
+	status.New(codes.OK, "OK") // Для максимальной идентичности HTTP сервису
 	return &shortener.PingResponse{Success: result}, nil
 }

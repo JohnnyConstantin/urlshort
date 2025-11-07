@@ -172,7 +172,6 @@ func (x *URLPair) GetCorrelationId() string {
 type CreateShortURLRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	OriginalUrl   string                 `protobuf:"bytes,1,opt,name=original_url,json=originalUrl,proto3" json:"original_url,omitempty"`
-	UserId        string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -210,13 +209,6 @@ func (*CreateShortURLRequest) Descriptor() ([]byte, []int) {
 func (x *CreateShortURLRequest) GetOriginalUrl() string {
 	if x != nil {
 		return x.OriginalUrl
-	}
-	return ""
-}
-
-func (x *CreateShortURLRequest) GetUserId() string {
-	if x != nil {
-		return x.UserId
 	}
 	return ""
 }
@@ -451,7 +443,6 @@ func (x *CreateShortURLBatchResponse) GetUrls() []*URLPair {
 
 type GetOriginalURLBatchRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -484,13 +475,6 @@ func (x *GetOriginalURLBatchRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use GetOriginalURLBatchRequest.ProtoReflect.Descriptor instead.
 func (*GetOriginalURLBatchRequest) Descriptor() ([]byte, []int) {
 	return file_shortener_proto_rawDescGZIP(), []int{9}
-}
-
-func (x *GetOriginalURLBatchRequest) GetUserId() string {
-	if x != nil {
-		return x.UserId
-	}
-	return ""
 }
 
 type GetOriginalURLBatchResponse struct {
@@ -540,7 +524,6 @@ func (x *GetOriginalURLBatchResponse) GetUrls() []*URLPair {
 type DeleteUserURLsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Urls          []string               `protobuf:"bytes,1,rep,name=urls,proto3" json:"urls,omitempty"`
-	UserId        string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -580,13 +563,6 @@ func (x *DeleteUserURLsRequest) GetUrls() []string {
 		return x.Urls
 	}
 	return nil
-}
-
-func (x *DeleteUserURLsRequest) GetUserId() string {
-	if x != nil {
-		return x.UserId
-	}
-	return ""
 }
 
 type DeleteUserURLsResponse struct {
@@ -814,10 +790,9 @@ const file_shortener_proto_rawDesc = "" +
 	"\aURLPair\x12!\n" +
 	"\foriginal_url\x18\x01 \x01(\tR\voriginalUrl\x12\x1b\n" +
 	"\tshort_url\x18\x02 \x01(\tR\bshortUrl\x12%\n" +
-	"\x0ecorrelation_id\x18\x03 \x01(\tR\rcorrelationId\"S\n" +
+	"\x0ecorrelation_id\x18\x03 \x01(\tR\rcorrelationId\":\n" +
 	"\x15CreateShortURLRequest\x12!\n" +
-	"\foriginal_url\x18\x01 \x01(\tR\voriginalUrl\x12\x17\n" +
-	"\auser_id\x18\x02 \x01(\tR\x06userId\"5\n" +
+	"\foriginal_url\x18\x01 \x01(\tR\voriginalUrl\"5\n" +
 	"\x16CreateShortURLResponse\x12\x1b\n" +
 	"\tshort_url\x18\x01 \x01(\tR\bshortUrl\"4\n" +
 	"\x15GetOriginalURLRequest\x12\x1b\n" +
@@ -828,14 +803,12 @@ const file_shortener_proto_rawDesc = "" +
 	"\x1aCreateShortURLBatchRequest\x12&\n" +
 	"\x04urls\x18\x01 \x03(\v2\x12.shortener.URLPairR\x04urls\"E\n" +
 	"\x1bCreateShortURLBatchResponse\x12&\n" +
-	"\x04urls\x18\x01 \x03(\v2\x12.shortener.URLPairR\x04urls\"5\n" +
-	"\x1aGetOriginalURLBatchRequest\x12\x17\n" +
-	"\auser_id\x18\x01 \x01(\tR\x06userId\"E\n" +
+	"\x04urls\x18\x01 \x03(\v2\x12.shortener.URLPairR\x04urls\"\x1c\n" +
+	"\x1aGetOriginalURLBatchRequest\"E\n" +
 	"\x1bGetOriginalURLBatchResponse\x12&\n" +
-	"\x04urls\x18\x01 \x03(\v2\x12.shortener.URLPairR\x04urls\"D\n" +
+	"\x04urls\x18\x01 \x03(\v2\x12.shortener.URLPairR\x04urls\"+\n" +
 	"\x15DeleteUserURLsRequest\x12\x12\n" +
-	"\x04urls\x18\x01 \x03(\tR\x04urls\x12\x17\n" +
-	"\auser_id\x18\x02 \x01(\tR\x06userId\"0\n" +
+	"\x04urls\x18\x01 \x03(\tR\x04urls\"0\n" +
 	"\x16DeleteUserURLsResponse\x12\x16\n" +
 	"\x06result\x18\x01 \x01(\tR\x06result\"\x11\n" +
 	"\x0fGetStatsRequest\"R\n" +

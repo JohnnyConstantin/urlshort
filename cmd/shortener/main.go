@@ -2,6 +2,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"flag"
@@ -10,18 +11,22 @@ import (
 	route "github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
-	"log"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+	"os/signal"
 	"strings"
+	"sync"
+	"syscall"
+	"time"
 
 	"github.com/JohnnyConstantin/urlshort/internal/app"
 	"github.com/JohnnyConstantin/urlshort/internal/certificates"
 	"github.com/JohnnyConstantin/urlshort/internal/config"
 	"github.com/JohnnyConstantin/urlshort/internal/store"
 	"github.com/JohnnyConstantin/urlshort/server/grpc"
+	grpcMiddleware "github.com/grpc-ecosystem/go-grpc-middleware"
 )
 
 var sugar zap.SugaredLogger
@@ -78,11 +83,13 @@ func main() {
 
 	// Запускаем HTTP-сервер для профилирования в отдельной горутине
 	go func() {
-		log.Println(http.ListenAndServe("localhost:6060", nil))
+		sugar.Info(http.ListenAndServe("localhost:6060", nil))
 	}()
 
 	// Вынес создание роутов в отдельную функцию
 	createHandlers(s.DB, router, sugar, handler)
+
+	var wg sync.WaitGroup
 
 	if config.Options.GRPCBaseAddr != "" {
 
@@ -100,35 +107,73 @@ func main() {
 			panic(err)
 		}
 
-		go startGRPCServer(grpcServer)
+		wg.Add(1)
+		go startGRPCServer(grpcServer, &wg)
 	}
 
-	// записываем в лог, что сервер запускается
-	sugar.Infow(
-		"Starting http server",
-		"addr", config.Options.Address,
-	)
-	startListenAndServe(s, router)
+	if config.Options.Address != "" {
+		// записываем в лог, что сервер запускается
+		sugar.Infow(
+			"Starting http server",
+			"addr", config.Options.Address,
+		)
+		go startListenAndServe(s, router)
+	}
+
+	wg.Wait()
 }
 
-func startGRPCServer(server *grpcserver.GRPCServer) {
+func startGRPCServer(server *grpcserver.GRPCServer, wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	lis, err := net.Listen("tcp", config.Options.GRPCBaseAddr)
 	if err != nil {
-		log.Fatal(err)
+		return
 	}
 
 	grpcServer := grpc.NewServer(
-	//grpc.UnaryInterceptor(grpcMiddleware.ChainUnaryServer(
-	//	grpcAuthInterceptor, // аналог WithAuth
-	//	grpcLoggingInterceptor, // аналог WithLogging
-	//	grpcRecoveryInterceptor,
-	//)),
+		grpc.UnaryInterceptor(grpcMiddleware.ChainUnaryServer(
+			grpcserver.GRPCLoggingInterceptor(&sugar), // аналог WithLogging
+			grpcserver.GRPCAuthInterceptor,            // аналог WithAuth
+		)),
 	)
 
 	shortener.RegisterShortenerServer(grpcServer, server)
 
-	if err := grpcServer.Serve(lis); err != nil {
-		log.Fatal(err)
+	// Канал для получения сигналов остановки
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM, syscall.SIGQUIT)
+
+	serverErr := make(chan error, 1)
+	go func() {
+		if err := grpcServer.Serve(lis); err != nil {
+			serverErr <- err
+		}
+	}()
+
+	select {
+	case <-stop:
+		sugar.Info("Received shutdown signal, gracefully shutting down gRPC server...")
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		stopped := make(chan struct{})
+		go func() {
+			grpcServer.GracefulStop()
+			close(stopped)
+		}()
+
+		select {
+		case <-ctx.Done():
+			sugar.Warn("gRPC server graceful shutdown timed out, forcing stop...")
+			grpcServer.Stop()
+		case <-stopped:
+			sugar.Info("gRPC server gracefully shut down")
+		}
+
+	case err := <-serverErr:
+		sugar.Error("gRPC server error: %v", err)
 	}
 }
 
@@ -181,7 +226,7 @@ func waitShutdown(errChan chan error, shutdownChan chan struct{}, sugar zap.Suga
 	go func() {
 		err := s.WaitForShutdown(sugar) // Ожидаем сигнала
 		if err != nil {
-			sugar.Error("Failed while shutting down: ", err)
+			sugar.Error("Failed while shutting down HTTP server: ", err)
 			errChan <- err
 		}
 		shutdownChan <- struct{}{} // Отправляем сигнал об успешном завершении
@@ -191,12 +236,12 @@ func waitShutdown(errChan chan error, shutdownChan chan struct{}, sugar zap.Suga
 	select {
 	case err := <-errChan: // Пришла ошибка
 		if err != nil {
-			sugar.Error("Received error while shutting down server", err)
+			sugar.Error("Received error while shutting down HTTP server", err)
 			return
 		}
-		sugar.Info("Server gracefully shut down")
+		sugar.Info("HTTP server gracefully shut down")
 	case <-shutdownChan: // Пришел сигнал успешного завершения
-		sugar.Info("Server gracefully shut down")
+		sugar.Info("HTTP server gracefully shut down")
 	}
 }
 
@@ -289,6 +334,11 @@ func loadEnvs() {
 	envG, ok := os.LookupEnv("TRUSTED_SUBNET")
 	if ok { // По условию значение может быть пустым, обработка этого случая находится в хендлере
 		config.Options.TrustedSubnet = envG
+	}
+
+	envH, ok := os.LookupEnv("GRPC_ADDR")
+	if ok && envH != "" {
+		config.Options.GRPCBaseAddr = envH
 	}
 }
 

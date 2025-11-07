@@ -30,7 +30,6 @@ message URLPair {
 
 message CreateShortURLRequest {
   string original_url = 1;
-  string user_id = 2;
 }
 
 message CreateShortURLResponse {
@@ -55,7 +54,6 @@ message CreateShortURLBatchResponse {
 }
 
 message GetOriginalURLBatchRequest {
-  string user_id = 1;
 }
 
 message GetOriginalURLBatchResponse {
@@ -64,7 +62,6 @@ message GetOriginalURLBatchResponse {
 
 message DeleteUserURLsRequest {
   repeated string urls = 1;
-  string user_id = 2;
 }
 
 message DeleteUserURLsResponse {
