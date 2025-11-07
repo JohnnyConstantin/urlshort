@@ -16,7 +16,8 @@ import (
 // TestServerCreation проверяет корректность создания сервера
 func TestServerCreation(t *testing.T) {
 	var s app.Server
-	server := s.NewServer()
+	service := app.Service{}
+	server := s.NewServer(&service)
 	router := server.Router
 	handler := server.Handler
 
@@ -37,7 +38,8 @@ func TestCreateHandlers(t *testing.T) {
 
 	// Создаем тестовый handler
 	var s app.Server
-	server := s.NewServer()
+	service := app.Service{}
+	server := s.NewServer(&service)
 	handler := server.Handler
 
 	router := route.NewRouter()
