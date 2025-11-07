@@ -102,7 +102,7 @@ func main() {
 		// Стартуем gRPC
 		grpcServer := grpcserver.NewGRPCServer(&service)
 
-		grpcServer.Db, err = storageDecider()
+		grpcServer.DB, err = storageDecider()
 		if err != nil {
 			panic(err)
 		}

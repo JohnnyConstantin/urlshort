@@ -70,7 +70,7 @@ func (h *Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
 	case config.StorageFile:
 		h.Service.Fuller = &FileFuller{Cfg: cfg}
 		h.Service.Fuller.InitMutex()
-		response, exists, isDeleted, err = h.Service.Fuller.GetFullURL(id)
+		response, exists, _, err = h.Service.Fuller.GetFullURL(id)
 		if err != nil {
 			sugar.Error(err)
 			http.Error(w, store.DefaultError, http.StatusInternalServerError)
@@ -79,7 +79,7 @@ func (h *Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
 	case config.StorageMemory:
 		h.Service.Fuller = &MemoryFuller{Cfg: cfg}
 		h.Service.Fuller.InitMutex()
-		response, exists, isDeleted, err = h.Service.Fuller.GetFullURL(id)
+		response, exists, _, err = h.Service.Fuller.GetFullURL(id)
 		if err != nil {
 			sugar.Error(err)
 			http.Error(w, store.DefaultError, store.DefaultErrorCode)
@@ -87,7 +87,7 @@ func (h *Handler) GetHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	case config.StorageDB:
 		// Если StorageDB, то в context не может быть nil (на это есть проверка в main), однако, на всякий случай здесь повторяем
-		db, ok := r.Context().Value(DbKey).(*sql.DB)
+		db, ok := r.Context().Value(DBKey).(*sql.DB)
 		if !ok {
 			sugar.Errorf("Not supported storage type: %v", cfg.StorageType)
 			http.Error(w, store.DefaultError, store.InternalSeverErrorCode)
@@ -169,14 +169,14 @@ func (h *Handler) PostHandler(w http.ResponseWriter, r *http.Request) {
 		h.Service.Shortener = &FileShortener{Cfg: cfg}
 		h.Service.Shortener.InitMutex()
 		status = http.StatusCreated
-		shorten_req := Shortenerequest{OriginalURL: OriginalURL.URL}
-		ShortURL = h.Service.Shortener.ShortenURL(shorten_req)
+		shortenReq := Shortenerequest{OriginalURL: OriginalURL.URL}
+		ShortURL = h.Service.Shortener.ShortenURL(shortenReq)
 	case config.StorageMemory:
 		h.Service.Shortener = &MemoryShortener{Cfg: cfg}
 		h.Service.Shortener.InitMutex()
 		status = http.StatusCreated
-		shorten_req := Shortenerequest{OriginalURL: OriginalURL.URL}
-		ShortURL = h.Service.Shortener.ShortenURL(shorten_req)
+		shortenReq := Shortenerequest{OriginalURL: OriginalURL.URL}
+		ShortURL = h.Service.Shortener.ShortenURL(shortenReq)
 	case config.StorageDB:
 		db, userID, errs := initCtx(r)
 		if errs != nil {
@@ -185,8 +185,8 @@ func (h *Handler) PostHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		h.Service.Shortener = &DBShortener{db, cfg}
-		shorten_req := Shortenerequest{OriginalURL: OriginalURL.URL, UserID: userID}
-		ShortURL = h.Service.Shortener.ShortenURL(shorten_req)
+		shortenReq := Shortenerequest{OriginalURL: OriginalURL.URL, UserID: userID}
+		ShortURL = h.Service.Shortener.ShortenURL(shortenReq)
 	default:
 		sugar.Errorf("Unsupported storage type: %v", cfg.StorageType)
 		http.Error(w, store.DefaultError, store.DefaultErrorCode)
@@ -259,8 +259,8 @@ func (h *Handler) PostHandlerMultiple(w http.ResponseWriter, r *http.Request) {
 		h.Service.Shortener = &FileShortener{Cfg: cfg}
 		h.Service.Shortener.InitMutex()
 		for _, req := range requests {
-			shorten_req := Shortenerequest{OriginalURL: req.OriginalURL}
-			ShortURL = h.Service.Shortener.ShortenURL(shorten_req)
+			shortenReq := Shortenerequest{OriginalURL: req.OriginalURL}
+			ShortURL = h.Service.Shortener.ShortenURL(shortenReq)
 
 			responses = append(responses, models.BatchShortenResponse{
 				CorrelationID: req.CorrelationID,
@@ -272,8 +272,8 @@ func (h *Handler) PostHandlerMultiple(w http.ResponseWriter, r *http.Request) {
 		h.Service.Shortener = &MemoryShortener{Cfg: cfg}
 		h.Service.Shortener.InitMutex()
 		for _, req := range requests {
-			shorten_req := Shortenerequest{OriginalURL: req.OriginalURL}
-			ShortURL = h.Service.Shortener.ShortenURL(shorten_req)
+			shortenReq := Shortenerequest{OriginalURL: req.OriginalURL}
+			ShortURL = h.Service.Shortener.ShortenURL(shortenReq)
 
 			responses = append(responses, models.BatchShortenResponse{
 				CorrelationID: req.CorrelationID,
@@ -289,8 +289,8 @@ func (h *Handler) PostHandlerMultiple(w http.ResponseWriter, r *http.Request) {
 		}
 		h.Service.Shortener = &DBShortener{db, cfg}
 		for _, req := range requests {
-			shorten_req := Shortenerequest{OriginalURL: req.OriginalURL, UserID: userID}
-			ShortURL = h.Service.Shortener.ShortenURL(shorten_req)
+			shortenReq := Shortenerequest{OriginalURL: req.OriginalURL, UserID: userID}
+			ShortURL = h.Service.Shortener.ShortenURL(shortenReq)
 
 			responses = append(responses, models.BatchShortenResponse{
 				CorrelationID: req.CorrelationID,
@@ -327,7 +327,7 @@ func (h *Handler) DeleteHandlerMultiple(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	deleter := DBDeleter{Cfg: config.GetStorageConfig(), Db: db}
+	deleter := DBDeleter{Cfg: config.GetStorageConfig(), DB: db}
 
 	// Парсим тело запроса
 	var shortURLs []string
@@ -395,7 +395,7 @@ func (h *Handler) GetHandlerStats(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Извлекаем бд из контекста
-	db, ok := r.Context().Value(DbKey).(*sql.DB)
+	db, ok := r.Context().Value(DBKey).(*sql.DB)
 	if !ok {
 		sugar.Errorf("Error in getting DB connection from context")
 		return
@@ -492,7 +492,7 @@ func GzipHandle(next http.HandlerFunc) http.HandlerFunc {
 func (h *Handler) PingDBHandler(w http.ResponseWriter, r *http.Request) {
 	cfg := config.GetStorageConfig()
 	if cfg.StorageType == config.StorageDB {
-		db, ok := r.Context().Value(DbKey).(*sql.DB)
+		db, ok := r.Context().Value(DBKey).(*sql.DB)
 		if !ok {
 			http.Error(w, store.ConnectionError, http.StatusInternalServerError)
 		}
@@ -506,7 +506,7 @@ func (h *Handler) PingDBHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func initCtx(r *http.Request) (*sql.DB, string, error) {
-	db, ok := r.Context().Value(DbKey).(*sql.DB)
+	db, ok := r.Context().Value(DBKey).(*sql.DB)
 	if !ok {
 		return nil, "", errors.New("DB not in context")
 	}

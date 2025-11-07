@@ -11,7 +11,7 @@ import (
 
 // DBFuller объект "разворачивания" URL c использованием БД
 type DBFuller struct {
-	Db  *sql.DB
+	DB  *sql.DB
 	Cfg config.StorageConfig
 }
 
@@ -38,14 +38,14 @@ func (f *MemoryFuller) InitMutex() {
 }
 
 // InitMutex mock для БД
-func (s *DBFuller) InitMutex() {
+func (f *DBFuller) InitMutex() {
 }
 
 // GetFullURL получить из БД полную URL по сокращенному
 func (f *DBFuller) GetFullURL(shortID string) (models.ShortenRequest, bool, bool, error) {
 	result := models.ShortenRequest{URL: ""}
 
-	originalURL, exists, isDeleted, err := store.Read(f.Db, shortID)
+	originalURL, exists, isDeleted, err := store.Read(f.DB, shortID)
 	if err != nil {
 		return result, false, false, err
 	}

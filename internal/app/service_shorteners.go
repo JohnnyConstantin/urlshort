@@ -13,7 +13,7 @@ import (
 
 // DBShortener объект "сворачивания" URL c использованием БД
 type DBShortener struct {
-	Db  *sql.DB
+	DB  *sql.DB
 	Cfg config.StorageConfig
 }
 
@@ -58,7 +58,7 @@ func (s *DBShortener) ShortenURL(opts Shortenerequest) models.ShortenResponse {
 		OriginalURL: originalURL,
 	}
 
-	shortID, _, err := store.Insert(s.Db, record, userID)
+	shortID, _, err := store.Insert(s.DB, record, userID)
 	if err != nil {
 		return models.ShortenResponse{}
 	}
